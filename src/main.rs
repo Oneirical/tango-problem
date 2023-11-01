@@ -42,18 +42,27 @@ pub struct Floor {
 pub fn create_map(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
 ) {
     commands.spawn(Camera2dBundle::default());
 
     let play_space = Map::new_map();
+    let img_path = "spritesheet.png".to_string();
+    let texture_handle = asset_server.load(&img_path);
+    let texture_atlas = TextureAtlas::from_grid(
+        texture_handle,
+        Vec2::new(16.0, 16.0),
+        80, 2, None, None
+    );
+    let texture_atlas_handle = texture_atlases.add(texture_atlas);
     for i in play_space.tiles{
-        let texture = asset_server.load("22677410.png");
-        commands.spawn(SpriteBundle {
-            sprite: Sprite {
+        commands.spawn(SpriteSheetBundle {
+            texture_atlas: texture_atlas_handle.clone(),
+            sprite: TextureAtlasSprite{
+                index : 1,
                 custom_size: Some(Vec2::new(64.0, 64.0)),
                 ..default()
             },
-            texture,
             transform: Transform {
                 translation: Vec3{ x: i.x as f32 * 64.0, y: i.y as f32 * 64.0, z: 0.0},
                 ..default()
@@ -64,7 +73,7 @@ pub fn create_map(
 }
 
 fn character_movement(
-    mut characters: Query<(&mut Transform, &Sprite)>,
+    mut characters: Query<(&mut Transform, &TextureAtlasSprite)>,
     input: Res<Input<KeyCode>>,
     time: Res<Time>,
 ) {

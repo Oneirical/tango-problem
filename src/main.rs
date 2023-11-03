@@ -8,7 +8,7 @@ fn main() {
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         title: "TGFP".into(),
-                        resolution: (640.0, 480.0).into(),
+                        resolution: (1920.0, 1080.0).into(),
                         //resizable: false,
                         ..default()
                     }),
@@ -18,6 +18,7 @@ fn main() {
         )
         .add_systems(Startup, create_map)
         .add_systems(Update, character_movement)
+        .add_systems(Update, zoom_2d)
         .run();
 }
 
@@ -47,7 +48,7 @@ pub fn create_map(
     commands.spawn(Camera2dBundle::default());
 
     let play_space = Map::new_map();
-    let img_path = "spritesheet.png".to_string();
+    let img_path = "spritesheet.png".to_owned();
     let texture_handle = asset_server.load(&img_path);
     let texture_atlas = TextureAtlas::from_grid(
         texture_handle,
@@ -55,6 +56,19 @@ pub fn create_map(
         80, 2, None, None
     );
     let texture_atlas_handle = texture_atlases.add(texture_atlas);
+    commands.spawn(SpriteSheetBundle {
+        texture_atlas: texture_atlas_handle.clone(),
+        sprite: TextureAtlasSprite{
+            index : 2,
+            custom_size: Some(Vec2::new(64.0*45.0, 64.0*45.0)),
+            ..default()
+        },
+        transform: Transform {
+            translation: Vec3{ x: 64.0 * 22.0, y: 64.0*22.0, z: 0.0},
+            ..default()
+        },
+        ..default()
+    });
     for i in play_space.tiles{
         commands.spawn(SpriteSheetBundle {
             texture_atlas: texture_atlas_handle.clone(),
@@ -79,16 +93,16 @@ fn character_movement(
 ) {
     for (mut transform, _) in &mut characters {
         if input.pressed(KeyCode::W) {
-            transform.translation.y += 1000.0 * time.delta_seconds();
-        }
-        if input.pressed(KeyCode::S) {
             transform.translation.y -= 1000.0 * time.delta_seconds();
         }
+        if input.pressed(KeyCode::S) {
+            transform.translation.y += 1000.0 * time.delta_seconds();
+        }
         if input.pressed(KeyCode::D) {
-            transform.translation.x += 1000.0 * time.delta_seconds();
+            transform.translation.x -= 1000.0 * time.delta_seconds();
         }
         if input.pressed(KeyCode::A) {
-            transform.translation.x -= 1000.0 * time.delta_seconds();
+            transform.translation.x += 1000.0 * time.delta_seconds();
         }
     }
 }
@@ -111,14 +125,41 @@ impl Map {
         let mut x_count = 0;
         let mut y_count = 0;
         for i in &mut map.tiles{
-            if x_count > map.width{
+            if x_count > map.width-1{
                 x_count = 0;
                 y_count += 1;
             }
             i.x = x_count;
             i.y = y_count;
+            assert!((0..45).contains(&i.x));
             x_count += 1;
         }
         map
+    }
+}
+
+fn zoom_2d(
+    mut q: Query<&mut OrthographicProjection, With<Camera2d>>,
+    input: Res<Input<KeyCode>>,
+    time: Res<Time>,
+) {
+    if input.pressed(KeyCode::O) {
+        let mut projection = q.single_mut();
+
+        // example: zoom in
+        projection.scale += 0.8 * time.delta_seconds();
+        // example: zoom out
+        //projection.scale *= 0.75;
+    
+        // always ensure you end up with sane values
+        // (pick an upper and lower bound for your application)
+        projection.scale = projection.scale.clamp(0.5, 5.0);
+    }
+    else if input.pressed(KeyCode::P) {
+        let mut projection = q.single_mut();
+
+        // example: zoom in
+        projection.scale -= 0.8 * time.delta_seconds();
+        projection.scale = projection.scale.clamp(0.5, 5.0);
     }
 }

@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::sprite::Anchor::BottomLeft;
 
 use crate::SpriteSheetHandle;
 
@@ -6,6 +7,7 @@ pub struct PsychicPlugin;
 
 impl Plugin for PsychicPlugin {
     fn build(&self, app: &mut App) {
+        app.insert_resource(PsychicSettings{number_at_start: 16});
         app.add_systems(Startup, distribute_psychics);
     }
 }
@@ -19,7 +21,7 @@ pub struct PsychicBundle {
 
 }
 
-impl PsychicBundle {
+impl PsychicBundle { // This is the start of something great. 8th November 2023
     pub fn new(
         tex_handle: &SpriteSheetHandle
     ) -> Self {
@@ -28,12 +30,14 @@ impl PsychicBundle {
             sprite_bundle : SpriteSheetBundle {
                 texture_atlas: texture_atlas_handle.clone(),
                 sprite: TextureAtlasSprite{
-                    index : 0 as usize,
+                    index : 0_usize,
                     custom_size: Some(Vec2::new(16.0, 16.0)),
+                    anchor: BottomLeft,
                     ..default()
                 },
                 transform: Transform {
                     translation: Vec3{ x: 0., y: 0., z: 0.0},
+                    
                     ..default()
                 },
                 ..default()
@@ -43,9 +47,11 @@ impl PsychicBundle {
             position: Position { x: 0, y: 0 },
         }
     }
-    pub fn with_position(mut self, x: u32, y: u32) -> Self {
+    pub fn with_position(mut self, x: u32, y: u32) -> Self { // Absolutely immaculate!
         self.position.x = x;
         self.position.y = y;
+        self.sprite_bundle.transform.translation.x = x as f32 * 16.0;
+        self.sprite_bundle.transform.translation.y = y as f32 * 16.0;
         self
     }
 }
@@ -58,7 +64,7 @@ pub struct Soul{}
 
 #[derive(Resource)]
 pub struct PsychicSettings {
-    pub(crate) number_at_start: u32,
+    number_at_start: u32,
 }
 
 #[derive(Component)]
@@ -67,7 +73,7 @@ pub struct Position{
     y: u32,
 }
 
-pub fn distribute_psychics(
+fn distribute_psychics(
     mut commands: Commands,
     psy_settings: Res<PsychicSettings>,
     tex_handle: Res<SpriteSheetHandle>,
@@ -77,8 +83,7 @@ pub fn distribute_psychics(
     let psy_amount = psy_settings.number_at_start;
     for i in 0..psy_amount{
         let psy = PsychicBundle::new(&tex_handle)
-            .with_position(10+i, 20);
+            .with_position(0+i, 0);
         commands.spawn(psy);
     }
-
 }

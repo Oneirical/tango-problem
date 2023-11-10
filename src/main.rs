@@ -1,9 +1,13 @@
 mod psychics;
+mod timeline;
 mod ui;
+mod nn;
+mod util;
 
 use bevy::prelude::*;
 use psychics::PsychicPlugin;
 use ui::UIPlugin;
+use timeline::TimePlugin;
 
 fn main() {
     App::new()
@@ -26,6 +30,7 @@ fn main() {
         .add_systems(Startup, load_camera)
         .add_plugins(UIPlugin)
         .add_plugins(PsychicPlugin)
+        .add_plugins(TimePlugin)
         .add_systems(Update, character_movement)
         .add_systems(Update, zoom_2d)
         .run();

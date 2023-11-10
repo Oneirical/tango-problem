@@ -1,7 +1,12 @@
+use std::time::Duration;
+
 use bevy::prelude::*;
 use bevy::sprite::Anchor::BottomLeft;
+use bevy_tweening::lens::TransformPositionLens;
+use bevy_tweening::{Animator, Tween, EaseFunction};
 
 use crate::SpriteSheetHandle;
+use crate::nn::Net;
 
 pub struct PsychicPlugin;
 
@@ -18,7 +23,7 @@ pub struct PsychicBundle {
     psychic: Psychic,
     soul: Soul,
     position: Position,
-
+    animation: Animator<Transform>,
 }
 
 impl PsychicBundle { // This is the start of something great. 8th November 2023
@@ -26,6 +31,14 @@ impl PsychicBundle { // This is the start of something great. 8th November 2023
         tex_handle: &SpriteSheetHandle
     ) -> Self {
         let texture_atlas_handle = &tex_handle.handle;
+        let tween = Tween::new(
+            EaseFunction::QuadraticInOut,
+            Duration::from_secs(1),
+            TransformPositionLens {
+                start: Vec3::ZERO,
+                end: Vec3::ZERO,
+            },
+        );
         Self{
             sprite_bundle : SpriteSheetBundle {
                 texture_atlas: texture_atlas_handle.clone(),
@@ -42,9 +55,19 @@ impl PsychicBundle { // This is the start of something great. 8th November 2023
                 },
                 ..default()
             },
-            psychic: Psychic {  },
-            soul: Soul {  },
+            psychic: Psychic {},
+            soul: Soul {                 
+            nn: Net::new(vec![
+                3_usize,
+                3,
+                3,
+            ]),
+            senses_input: Vec::new(),
+            decision_outputs: Vec::new(), 
+            action_choices: vec![ActionType::North, ActionType::South, ActionType::West, ActionType::East, ActionType::Wait]
+        },
             position: Position { x: 0, y: 0 },
+            animation: Animator::new(tween)
         }
     }
     pub fn with_position(mut self, x: u32, y: u32) -> Self { // Absolutely immaculate!
@@ -57,10 +80,25 @@ impl PsychicBundle { // This is the start of something great. 8th November 2023
 }
 
 #[derive(Component)]
-pub struct Psychic{}
+pub struct Psychic{
+}
 
 #[derive(Component)]
-pub struct Soul{}
+pub struct Soul{
+    pub nn: Net,
+    pub decision_outputs: Vec<f64>,
+    pub senses_input: Vec<f64>,
+    pub action_choices: Vec<ActionType>,
+}
+
+#[derive(Clone, Copy)]
+pub enum ActionType{
+    North,
+    South,
+    West,
+    East,
+    Wait
+}
 
 #[derive(Resource)]
 pub struct PsychicSettings {
@@ -69,8 +107,8 @@ pub struct PsychicSettings {
 
 #[derive(Component)]
 pub struct Position{
-    x: u32,
-    y: u32,
+    pub x: u32,
+    pub y: u32,
 }
 
 fn distribute_psychics(
@@ -83,7 +121,7 @@ fn distribute_psychics(
     let psy_amount = psy_settings.number_at_start;
     for i in 0..psy_amount{
         let psy = PsychicBundle::new(&tex_handle)
-            .with_position(0+i, 0);
+            .with_position(5+i, 5);
         commands.spawn(psy);
     }
 }

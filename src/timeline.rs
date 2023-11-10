@@ -1,17 +1,18 @@
 use std::time::Duration;
-use bevy::prelude::*;
+use bevy::{prelude::*, utils::dbg};
 use bevy_tweening::{Animator, EaseFunction, lens::TransformPositionLens, Tween};
 
-use crate::psychics::{Position, Soul, ActionType, InTheatre, FinishedTrace, Trace};
+use crate::psychics::{Position, Soul, ActionType, FinishedTrace, Trace, PsychicSettings};
 
 pub struct TimePlugin;
 
 impl Plugin for TimePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(TheatreSettings{time_between_turns: Timer::new(Duration::from_millis(200), TimerMode::Repeating), current_turn: 0, max_turn_number: 100});
-        app.insert_resource(SimulationSettings{max_turn_number: 100, current_turn: 0});
+        app.insert_resource(SimulationSettings{max_turn_number: 100, current_turn: 0, current_generation: 0});
         app.add_systems(Update, time_passes);
         app.add_systems(Update, simulate_generation);
+        app.add_systems(Update, ship_gen_to_theatre);
     }
 }
 
@@ -29,7 +30,8 @@ pub struct TheatreSettings {
 #[derive(Resource)]
 pub struct SimulationSettings {
     pub max_turn_number: usize,
-    pub current_turn: usize
+    pub current_turn: usize,
+    pub current_generation: usize
 }
 
 fn process_motion(
@@ -49,25 +51,55 @@ fn process_motion(
     (process_x(cur_x as i32 + dx) as u32, process_y(cur_y as i32 + dy) as u32)
 }
 
-fn simulate_generation(
-    mut config: ResMut<SimulationSettings>,
-    mut psychics: Query<(&mut Position, &mut Soul, &mut Trace), Without<InTheatre>>
+fn ship_gen_to_theatre(
+    ship: Query<&Trace>,
+    mut theatre: Query<&mut FinishedTrace>,
+    keys: Res<Input<KeyCode>>,
+    psy_sets: Res<PsychicSettings>,
+    mut config: ResMut<TheatreSettings>,
 ){
-    if config.current_turn >= config.max_turn_number{
+    if !keys.just_pressed(KeyCode::Space) {
         return;
     }
+    let mut all_positions = Vec::with_capacity(psy_sets.number_at_start as usize);
+    let mut index_num = 0;
+    for tracer in ship.iter(){
+        all_positions.push(tracer.shipped_positions.clone());
+        index_num += 1;
+    }
+    index_num = 0;
+    for mut displayed in theatre.iter_mut(){
+        displayed.positions = all_positions[index_num].clone();
+        index_num += 1;
+    }
+    config.current_turn = 0;
+}
+
+fn simulate_generation(
+    mut config: ResMut<SimulationSettings>,
+    mut psychics: Query<(&mut Position, &mut Soul, &mut Trace)>,
+){
     for (mut position, mut soul, mut trace) in psychics.iter_mut(){
         if config.current_turn == 0 {
             trace.positions = Vec::with_capacity(config.max_turn_number);
+        }
+        if config.current_turn >= config.max_turn_number{
+            trace.shipped_positions = trace.positions.clone();
+            (position.x, position.y) = position.starting_position;
+            continue;
         }
         soul.decision_outputs = soul.nn.decide(&soul.senses_input);
         let index_of_biggest = soul.decision_outputs.iter().enumerate().fold((0, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
         let final_decision = soul.action_choices[index_of_biggest.0];
         let (checked_new_x, checked_new_y) = process_motion(position.x, position.y, final_decision);
         (position.x, position.y) = (checked_new_x, checked_new_y);
-        trace.positions[config.current_turn] = (position.x, position.y);
+        trace.positions.push((position.x, position.y));
     }
     config.current_turn += 1;
+    if config.current_turn > config.max_turn_number{
+        config.current_turn = 0;
+        config.current_generation += 1;
+    }
 }
 
 fn time_passes(
@@ -78,6 +110,9 @@ fn time_passes(
     config.time_between_turns.tick(time.delta());
     if config.time_between_turns.finished() {
         for (transform, mut anim, trace) in psychics.iter_mut(){
+            if trace.positions.len() == 0 {
+                continue;
+            }
             let (x, y) = (trace.positions[config.current_turn].0, trace.positions[config.current_turn].1);
             let start = transform.translation;
             let tween = Tween::new(

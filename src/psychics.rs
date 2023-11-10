@@ -19,14 +19,19 @@ impl Plugin for PsychicPlugin {
 
 #[derive(Bundle)]
 pub struct PsychicBundle {
-    sprite_bundle: SpriteSheetBundle,
-    psychic: Psychic,
     soul: Soul,
     position: Position,
-    animation: Animator<Transform>,
+    trace: Trace
 }
 
-impl PsychicBundle { // This is the start of something great. 8th November 2023
+#[derive(Bundle)]
+pub struct TheatreBundle {
+    sprite_bundle: SpriteSheetBundle,
+    animation: Animator<Transform>,
+    finished_trace: FinishedTrace
+}
+
+impl TheatreBundle {
     pub fn new(
         tex_handle: &SpriteSheetHandle
     ) -> Self {
@@ -55,26 +60,33 @@ impl PsychicBundle { // This is the start of something great. 8th November 2023
                 },
                 ..default()
             },
-            psychic: Psychic {},
+            animation: Animator::new(tween),
+            finished_trace: FinishedTrace{positions: Vec::new()},
+        }
+    }
+}
+
+impl PsychicBundle { // This is the start of something great. 8th November 2023
+    pub fn new() -> Self {
+        Self{
             soul: Soul {                 
-            nn: Net::new(vec![
-                3_usize,
-                3,
-                3,
-            ]),
-            senses_input: Vec::new(),
-            decision_outputs: Vec::new(), 
-            action_choices: vec![ActionType::North, ActionType::South, ActionType::West, ActionType::East, ActionType::Wait]
-        },
-            position: Position { x: 0, y: 0 },
-            animation: Animator::new(tween)
+                nn: Net::new(vec![
+                    3_usize,
+                    3,
+                    3,
+                ]),
+                senses_input: Vec::new(),
+                decision_outputs: Vec::new(), 
+                action_choices: vec![ActionType::North, ActionType::South, ActionType::West, ActionType::East, ActionType::Wait]
+            },
+            position: Position { x: 0, y: 0, starting_position: (0, 0) },
+            trace: Trace {positions: Vec::new(), shipped_positions: Vec::new()}
         }
     }
     pub fn with_position(mut self, x: u32, y: u32) -> Self { // Absolutely immaculate!
         self.position.x = x;
         self.position.y = y;
-        self.sprite_bundle.transform.translation.x = x as f32 * 16.0;
-        self.sprite_bundle.transform.translation.y = y as f32 * 16.0;
+        self.position.starting_position = (x, y);
         self
     }
 }
@@ -106,18 +118,20 @@ pub enum ActionType{
 
 #[derive(Resource)]
 pub struct PsychicSettings {
-    number_at_start: u32,
+    pub number_at_start: u32,
 }
 
 #[derive(Component)]
 pub struct Position{
     pub x: u32,
     pub y: u32,
+    pub starting_position: (u32, u32)
 }
 
 #[derive(Component)]
 pub struct Trace{
-    pub positions: Vec<(u32, u32)>
+    pub positions: Vec<(u32, u32)>,
+    pub shipped_positions: Vec<(u32, u32)>
 }
 
 #[derive(Component)]
@@ -134,8 +148,10 @@ fn distribute_psychics(
 ){
     let psy_amount = psy_settings.number_at_start;
     for i in 0..psy_amount{
-        let psy = PsychicBundle::new(&tex_handle)
+        let psy = PsychicBundle::new()
             .with_position(i, 0);
+        let theatre = TheatreBundle::new(&tex_handle);
         commands.spawn(psy);
+        commands.spawn(theatre);
     }
 }

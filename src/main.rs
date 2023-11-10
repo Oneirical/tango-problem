@@ -5,6 +5,7 @@ mod nn;
 mod util;
 
 use bevy::prelude::*;
+use bevy_tweening::TweeningPlugin;
 use psychics::PsychicPlugin;
 use ui::UIPlugin;
 use timeline::TimePlugin;
@@ -28,6 +29,7 @@ fn main() {
         .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
         .add_systems(PreStartup, load_spritesheet)
         .add_systems(Startup, load_camera)
+        .add_plugins(TweeningPlugin)
         .add_plugins(UIPlugin)
         .add_plugins(PsychicPlugin)
         .add_plugins(TimePlugin)
@@ -71,16 +73,16 @@ fn character_movement(
 ) {
     for (mut transform, _) in &mut characters {
         if input.pressed(KeyCode::W) {
-            transform.translation.y -= 1000.0 * time.delta_seconds();
-        }
-        if input.pressed(KeyCode::S) {
             transform.translation.y += 1000.0 * time.delta_seconds();
         }
+        if input.pressed(KeyCode::S) {
+            transform.translation.y -= 1000.0 * time.delta_seconds();
+        }
         if input.pressed(KeyCode::D) {
-            transform.translation.x -= 1000.0 * time.delta_seconds();
+            transform.translation.x += 1000.0 * time.delta_seconds();
         }
         if input.pressed(KeyCode::A) {
-            transform.translation.x += 1000.0 * time.delta_seconds();
+            transform.translation.x -= 1000.0 * time.delta_seconds();
         }
     }
 }

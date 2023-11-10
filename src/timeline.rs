@@ -8,14 +8,14 @@ pub struct TimePlugin;
 
 impl Plugin for TimePlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(TurnsSetting{time_between_turns: Timer::new(Duration::from_millis(500), TimerMode::Repeating)});
+        app.insert_resource(TurnsSetting{time_between_turns: Timer::new(Duration::from_millis(200), TimerMode::Repeating)});
         app.add_systems(Update, time_passes);
     }
 }
 
-const PLAY_AREA_WIDTH: u32 = 45;
-const PLAY_AREA_HEIGHT: u32 = 45;
-const TILE_SIZE: f32 = 16.;
+pub const PLAY_AREA_WIDTH: u32 = 45;
+pub const PLAY_AREA_HEIGHT: u32 = 45;
+pub const TILE_SIZE: f32 = 16.;
 
 #[derive(Resource)]
 pub struct TurnsSetting {
@@ -23,14 +23,13 @@ pub struct TurnsSetting {
 }
 
 fn time_passes(
-    mut commands: Commands,
     time: Res<Time>,
     mut config: ResMut<TurnsSetting>,
-    mut psychics: Query<(Entity, &mut Transform, &mut Position, &mut Soul), With<Psychic>>, // Later on, Has<Soul> could be good for non-nn creatures?
+    mut psychics: Query<(&Transform, &mut Position, &mut Soul, &mut Animator<Transform>), With<Psychic>>, // Later on, Has<Soul> could be good for non-nn creatures?
 ){
     config.time_between_turns.tick(time.delta());
     if config.time_between_turns.finished() {
-        for (entity, mut transform, mut position, mut soul) in psychics.iter_mut(){
+        for (transform, mut position, mut soul, mut anim) in psychics.iter_mut(){
             soul.decision_outputs = soul.nn.decide(&soul.senses_input);
             let index_of_biggest = soul.decision_outputs.iter().enumerate().fold((0, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
             let final_decision = soul.action_choices[index_of_biggest.0];
@@ -49,18 +48,17 @@ fn time_passes(
             position.y = checked_new_y;
             let start = transform.translation;
             
-            /*let tween = Tween::new(
+            let tween = Tween::new(
                 EaseFunction::QuadraticInOut,
-                Duration::from_millis(100),
+                Duration::from_millis(199),
                 TransformPositionLens {
                     start,
                     end: Vec3::new(TILE_SIZE * position.x as f32, TILE_SIZE * position.y as f32, 0.),
                 },
             );
-            */
-            transform.translation.x = TILE_SIZE * position.x as f32;
-            transform.translation.y = TILE_SIZE * position.y as f32;
-            //commands.entity(entity).insert(Animator::new(tween));
+            //transform.translation.x = TILE_SIZE * position.x as f32;
+            //transform.translation.y = TILE_SIZE * position.y as f32;
+            anim.set_tweenable(tween);
         }
     }
 }

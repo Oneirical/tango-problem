@@ -33,7 +33,7 @@ impl PsychicBundle { // This is the start of something great. 8th November 2023
         let texture_atlas_handle = &tex_handle.handle;
         let tween = Tween::new(
             EaseFunction::QuadraticInOut,
-            Duration::from_millis(1),
+            Duration::from_millis(1000),
             TransformPositionLens {
                 start: Vec3::ZERO,
                 end: Vec3::ZERO,
@@ -121,7 +121,7 @@ fn distribute_psychics(
     let psy_amount = psy_settings.number_at_start;
     for i in 0..psy_amount{
         let psy = PsychicBundle::new(&tex_handle)
-            .with_position(5+i, 5);
+            .with_position(i, 0);
         commands.spawn(psy);
     }
 }

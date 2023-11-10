@@ -84,6 +84,10 @@ pub struct Psychic{
 }
 
 #[derive(Component)]
+pub struct InTheatre{
+}
+
+#[derive(Component)]
 pub struct Soul{
     pub nn: Net,
     pub decision_outputs: Vec<f64>,
@@ -109,6 +113,16 @@ pub struct PsychicSettings {
 pub struct Position{
     pub x: u32,
     pub y: u32,
+}
+
+#[derive(Component)]
+pub struct Trace{
+    pub positions: Vec<(u32, u32)>
+}
+
+#[derive(Component)]
+pub struct FinishedTrace{
+    pub positions: Vec<(u32, u32)>
 }
 
 fn distribute_psychics(

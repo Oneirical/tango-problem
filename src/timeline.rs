@@ -48,19 +48,18 @@ fn time_passes(
             position.x = checked_new_x;
             position.y = checked_new_y;
             let start = transform.translation;
-            /*
-            let tween = Tween::new(
+            
+            /*let tween = Tween::new(
                 EaseFunction::QuadraticInOut,
                 Duration::from_millis(100),
                 TransformPositionLens {
                     start,
-                    end: Vec3::new(start.x + TILE_SIZE * position.x as f32, start.y + TILE_SIZE * position.y as f32, 0.),
+                    end: Vec3::new(TILE_SIZE * position.x as f32, TILE_SIZE * position.y as f32, 0.),
                 },
             );
-            dbg!(position.y);
             */
-            transform.translation.x = start.x + TILE_SIZE * position.x as f32;
-            transform.translation.y = start.y + TILE_SIZE * position.y as f32;
+            transform.translation.x = TILE_SIZE * position.x as f32;
+            transform.translation.y = TILE_SIZE * position.y as f32;
             //commands.entity(entity).insert(Animator::new(tween));
         }
     }

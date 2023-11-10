@@ -33,7 +33,7 @@ impl PsychicBundle { // This is the start of something great. 8th November 2023
         let texture_atlas_handle = &tex_handle.handle;
         let tween = Tween::new(
             EaseFunction::QuadraticInOut,
-            Duration::from_secs(1),
+            Duration::from_millis(1),
             TransformPositionLens {
                 start: Vec3::ZERO,
                 end: Vec3::ZERO,

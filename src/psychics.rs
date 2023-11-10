@@ -21,14 +21,16 @@ impl Plugin for PsychicPlugin {
 pub struct PsychicBundle {
     soul: Soul,
     position: Position,
-    trace: Trace
+    trace: Trace,
+    name: Name
 }
 
 #[derive(Bundle)]
 pub struct TheatreBundle {
     sprite_bundle: SpriteSheetBundle,
     animation: Animator<Transform>,
-    finished_trace: FinishedTrace
+    finished_trace: FinishedTrace,
+    name: Name
 }
 
 impl TheatreBundle {
@@ -62,6 +64,7 @@ impl TheatreBundle {
             },
             animation: Animator::new(tween),
             finished_trace: FinishedTrace{positions: Vec::new()},
+            name: Name::new("TheatreDisplay")
         }
     }
 }
@@ -80,7 +83,8 @@ impl PsychicBundle { // This is the start of something great. 8th November 2023
                 action_choices: vec![ActionType::North, ActionType::South, ActionType::West, ActionType::East, ActionType::Wait]
             },
             position: Position { x: 0, y: 0, starting_position: (0, 0) },
-            trace: Trace {positions: Vec::new(), shipped_positions: Vec::new()}
+            trace: Trace {positions: Vec::new(), shipped_positions: Vec::new()},
+            name: Name::new("Psychic")
         }
     }
     pub fn with_position(mut self, x: u32, y: u32) -> Self { // Absolutely immaculate!
@@ -148,8 +152,10 @@ fn distribute_psychics(
 ){
     let psy_amount = psy_settings.number_at_start;
     for i in 0..psy_amount{
+        let x = i & 4;
+        let y = (i as f32/ 4.).floor() as u32;
         let psy = PsychicBundle::new()
-            .with_position(i, 0);
+            .with_position(16+x, 16+y);
         let theatre = TheatreBundle::new(&tex_handle);
         commands.spawn(psy);
         commands.spawn(theatre);

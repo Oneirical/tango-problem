@@ -13,6 +13,7 @@ impl Plugin for TimePlugin {
         app.add_systems(Update, time_passes);
         app.add_systems(Update, simulate_generation);
         app.add_systems(Update, ship_gen_to_theatre);
+        app.register_type::<SimulationSettings>();
     }
 }
 
@@ -27,7 +28,8 @@ pub struct TheatreSettings {
     pub max_turn_number: usize,
 }
 
-#[derive(Resource)]
+#[derive(Resource, Default, Reflect)]
+#[reflect(Resource)]
 pub struct SimulationSettings {
     pub max_turn_number: usize,
     pub current_turn: usize,
@@ -75,28 +77,30 @@ fn ship_gen_to_theatre(
     config.current_turn = 0;
 }
 
-fn simulate_generation(
+fn simulate_generation( // Trying hard to make this concurrent with time_passes. Not sure if it will work. 10th November 2023
     mut config: ResMut<SimulationSettings>,
     mut psychics: Query<(&mut Position, &mut Soul, &mut Trace)>,
 ){
-    for (mut position, mut soul, mut trace) in psychics.iter_mut(){
-        if config.current_turn == 0 {
-            trace.positions = Vec::with_capacity(config.max_turn_number);
+    for turn in 0..config.max_turn_number+1{
+        for (mut position, mut soul, mut trace) in psychics.iter_mut(){
+            config.current_turn = turn;
+            if config.current_turn == 0 {
+                trace.positions = Vec::with_capacity(config.max_turn_number);
+            }
+            if config.current_turn >= config.max_turn_number{
+                trace.shipped_positions = trace.positions.clone();
+                (position.x, position.y) = position.starting_position;
+                continue;
+            }
+            soul.decision_outputs = soul.nn.decide(&soul.senses_input);
+            let index_of_biggest = soul.decision_outputs.iter().enumerate().fold((0, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
+            let final_decision = soul.action_choices[index_of_biggest.0];
+            let (checked_new_x, checked_new_y) = process_motion(position.x, position.y, final_decision);
+            (position.x, position.y) = (checked_new_x, checked_new_y);
+            trace.positions.push((position.x, position.y));
         }
-        if config.current_turn >= config.max_turn_number{
-            trace.shipped_positions = trace.positions.clone();
-            (position.x, position.y) = position.starting_position;
-            continue;
-        }
-        soul.decision_outputs = soul.nn.decide(&soul.senses_input);
-        let index_of_biggest = soul.decision_outputs.iter().enumerate().fold((0, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
-        let final_decision = soul.action_choices[index_of_biggest.0];
-        let (checked_new_x, checked_new_y) = process_motion(position.x, position.y, final_decision);
-        (position.x, position.y) = (checked_new_x, checked_new_y);
-        trace.positions.push((position.x, position.y));
     }
-    config.current_turn += 1;
-    if config.current_turn > config.max_turn_number{
+    if config.current_turn >= config.max_turn_number{
         config.current_turn = 0;
         config.current_generation += 1;
     }
@@ -110,7 +114,7 @@ fn time_passes(
     config.time_between_turns.tick(time.delta());
     if config.time_between_turns.finished() {
         for (transform, mut anim, trace) in psychics.iter_mut(){
-            if trace.positions.len() == 0 {
+            if trace.positions.len() == 0 || config.current_turn >= config.max_turn_number{
                 continue;
             }
             let (x, y) = (trace.positions[config.current_turn].0, trace.positions[config.current_turn].1);

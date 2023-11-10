@@ -8,7 +8,9 @@ use bevy::prelude::*;
 use bevy_tweening::TweeningPlugin;
 use psychics::PsychicPlugin;
 use ui::UIPlugin;
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use timeline::TimePlugin;
+use bevy::input::common_conditions::input_toggle_active;
 
 fn main() {
     App::new()
@@ -33,6 +35,9 @@ fn main() {
         .add_plugins(UIPlugin)
         .add_plugins(PsychicPlugin)
         .add_plugins(TimePlugin)
+        .add_plugins(
+            WorldInspectorPlugin::default().run_if(input_toggle_active(true, KeyCode::Escape)),
+        )
         .add_systems(Update, character_movement)
         .add_systems(Update, zoom_2d)
         .run();

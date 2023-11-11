@@ -1,12 +1,13 @@
+use bevy::reflect::Reflect;
 use rand::Rng;
 
-#[derive(Clone)]
+#[derive(Clone, Default, Reflect)]
 pub struct Net {
     n_inputs: usize,
     layers: Vec<Layer>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Reflect)]
 struct Layer {
     nodes: Vec<Vec<f64>>,
 }
@@ -37,8 +38,20 @@ impl Net {
         }
     }
     pub fn decide(&self, inputs: &Vec<f64>) -> Vec<f64> {
-        let mut rng = rand::thread_rng();
-        vec![rng.gen::<f64>(),rng.gen::<f64>(),rng.gen::<f64>(),rng.gen::<f64>(),rng.gen::<f64>()]
+        if inputs.len() != self.n_inputs {
+            panic!("Bad input size");
+        }
+
+        let mut outputs = Vec::new();
+        outputs.push(inputs.clone());
+        for (layer_index, layer) in self.layers.iter().enumerate() {
+            let layer_results = layer.predict(&outputs[layer_index]);
+            outputs.push(layer_results);
+        }
+        outputs[outputs.len()-1].clone()
+    }
+    pub fn mutate(&mut self) {
+        self.layers.iter_mut().for_each(|l| l.mutate());
     }
 }
 
@@ -57,5 +70,38 @@ impl Layer{
         }
 
         Self { nodes }
+    }
+    fn predict(&self, inputs: &Vec<f64>) -> Vec<f64> {
+        let mut layer_results = Vec::new();
+        for node in self.nodes.iter() {
+            layer_results.push(self.sigmoid(self.dot_prod(&node, &inputs)));
+        }
+
+        layer_results
+    }
+    fn mutate(&mut self) {
+        let mut rng = rand::thread_rng();
+        for n in self.nodes.iter_mut() {
+            for val in n.iter_mut() {
+                if rng.gen_range(0.0..1.0) >= 5.0 {
+                    continue;
+                }
+
+                *val += rng.gen_range(-0.5..0.5) as f64;
+            }
+        }
+    }
+    fn dot_prod(&self, node: &Vec<f64>, values: &Vec<f64>) -> f64 {
+        let mut it = node.iter();
+        let mut total = *it.next().unwrap();
+        for (weight, value) in it.zip(values.iter()) {
+            total += weight * value;
+        }
+
+        total
+    }
+
+    fn sigmoid(&self, y: f64) -> f64 {
+        1f64 / (1f64 + (-y).exp())
     }
 }

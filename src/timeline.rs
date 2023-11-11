@@ -1,8 +1,9 @@
 use std::time::Duration;
 use bevy::{prelude::*, utils::dbg};
 use bevy_tweening::{Animator, EaseFunction, lens::TransformPositionLens, Tween};
+use rand::{distributions::WeightedIndex, prelude::Distribution};
 
-use crate::psychics::{Position, Soul, ActionType, FinishedTrace, Trace, PsychicSettings};
+use crate::{psychics::{Position, Soul, ActionType, FinishedTrace, Trace, PsychicSettings}, nn::Net};
 
 pub struct TimePlugin;
 
@@ -13,6 +14,7 @@ impl Plugin for TimePlugin {
         app.add_systems(Update, time_passes);
         app.add_systems(Update, simulate_generation);
         app.add_systems(Update, ship_gen_to_theatre);
+        app.add_systems(Update, evolve_generation);
         app.register_type::<SimulationSettings>();
     }
 }
@@ -77,21 +79,70 @@ fn ship_gen_to_theatre(
     config.current_turn = 0;
 }
 
+fn evolve_generation(
+    mut config: ResMut<SimulationSettings>,
+    mut psychics: Query<(&mut Position, &mut Soul, &mut Trace)>,
+    psy_settings: Res<PsychicSettings>,
+
+){
+    if config.current_turn < config.max_turn_number{
+        return;
+    }
+    config.current_turn = 0;
+    config.current_generation += 1;
+    let mut all_souls: Vec<Net> = Vec::with_capacity(psy_settings.number_at_start as usize); 
+    let mut all_fitnesses: Vec<f32> = Vec::with_capacity(psy_settings.number_at_start as usize);
+    for (mut position, mut soul, mut trace) in psychics.iter_mut(){
+        let final_fitness = ((position.x as i32 - 5).abs() + (position.y as i32 - 5).abs()) as f32;
+        soul.fitness = final_fitness;
+        trace.shipped_positions = trace.positions.clone();
+        (position.x, position.y) = position.starting_position;
+        all_souls.push(soul.nn.clone());
+        all_fitnesses.push(final_fitness);
+    }
+    //dbg!(all_fitnesses.clone());
+    let (_max_fitness, gene_pool) = create_gene_pool(all_fitnesses);
+    let mut rng = rand::thread_rng();
+    for (mut _position, mut soul, mut _trace) in psychics.iter_mut(){
+        let soul_idx = gene_pool.sample(&mut rng);
+        let mut rand_soul = all_souls[soul_idx].clone();
+        rand_soul.mutate();
+        soul.nn = rand_soul;
+    }
+}
+
+fn create_gene_pool(values: Vec<f32>) -> (f32, WeightedIndex<f32>) {
+    let mut max_fitness = 0.0;
+    let mut weights = Vec::new();
+
+    for v in values.iter() {
+        if *v > max_fitness {
+            max_fitness = *v;
+        }
+        weights.push(*v);
+    }
+
+    (
+        max_fitness,
+        WeightedIndex::new(&weights).expect("Failed to generate gene pool"),
+    )
+}
+
 fn simulate_generation( // Trying hard to make this concurrent with time_passes. Not sure if it will work. 10th November 2023
     mut config: ResMut<SimulationSettings>,
     mut psychics: Query<(&mut Position, &mut Soul, &mut Trace)>,
-){
+){    
+    assert!(config.current_turn < config.max_turn_number);
+    if config.current_turn == config.max_turn_number{
+        return;
+    }
     for turn in 0..config.max_turn_number+1{
         for (mut position, mut soul, mut trace) in psychics.iter_mut(){
             config.current_turn = turn;
             if config.current_turn == 0 {
                 trace.positions = Vec::with_capacity(config.max_turn_number);
             }
-            if config.current_turn >= config.max_turn_number{
-                trace.shipped_positions = trace.positions.clone();
-                (position.x, position.y) = position.starting_position;
-                continue;
-            }
+            soul.senses_input = vec![(position.x/PLAY_AREA_WIDTH).into(), (position.y/PLAY_AREA_HEIGHT).into()];
             soul.decision_outputs = soul.nn.decide(&soul.senses_input);
             let index_of_biggest = soul.decision_outputs.iter().enumerate().fold((0, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
             let final_decision = soul.action_choices[index_of_biggest.0];
@@ -99,10 +150,6 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
             (position.x, position.y) = (checked_new_x, checked_new_y);
             trace.positions.push((position.x, position.y));
         }
-    }
-    if config.current_turn >= config.max_turn_number{
-        config.current_turn = 0;
-        config.current_generation += 1;
     }
 }
 

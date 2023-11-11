@@ -14,6 +14,8 @@ impl Plugin for PsychicPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(PsychicSettings{number_at_start: 16});
         app.add_systems(Startup, distribute_psychics);
+        app.register_type::<Soul>();
+        app.register_type::<Position>();
     }
 }
 
@@ -22,7 +24,7 @@ pub struct PsychicBundle {
     soul: Soul,
     position: Position,
     trace: Trace,
-    name: Name
+    name: Name,
 }
 
 #[derive(Bundle)]
@@ -74,13 +76,14 @@ impl PsychicBundle { // This is the start of something great. 8th November 2023
         Self{
             soul: Soul {                 
                 nn: Net::new(vec![
-                    3_usize,
-                    3,
-                    3,
+                    2_usize,
+                    15,
+                    5,
                 ]),
                 senses_input: Vec::new(),
                 decision_outputs: Vec::new(), 
-                action_choices: vec![ActionType::North, ActionType::South, ActionType::West, ActionType::East, ActionType::Wait]
+                action_choices: vec![ActionType::North, ActionType::South, ActionType::West, ActionType::East, ActionType::Wait],
+                fitness: 0.
             },
             position: Position { x: 0, y: 0, starting_position: (0, 0) },
             trace: Trace {positions: Vec::new(), shipped_positions: Vec::new()},
@@ -103,15 +106,17 @@ pub struct Psychic{
 pub struct InTheatre{
 }
 
-#[derive(Component)]
+#[derive(Component, Default, Reflect)]
+#[reflect(Component)]
 pub struct Soul{
     pub nn: Net,
     pub decision_outputs: Vec<f64>,
     pub senses_input: Vec<f64>,
     pub action_choices: Vec<ActionType>,
+    pub fitness: f32,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Reflect)]
 pub enum ActionType{
     North,
     South,
@@ -125,7 +130,7 @@ pub struct PsychicSettings {
     pub number_at_start: u32,
 }
 
-#[derive(Component)]
+#[derive(Component, Default, Reflect)]
 pub struct Position{
     pub x: u32,
     pub y: u32,
@@ -152,10 +157,10 @@ fn distribute_psychics(
 ){
     let psy_amount = psy_settings.number_at_start;
     for i in 0..psy_amount{
-        let x = i & 4;
+        let x = i % 4;
         let y = (i as f32/ 4.).floor() as u32;
         let psy = PsychicBundle::new()
-            .with_position(16+x, 16+y);
+            .with_position(21+x, 21+y);
         let theatre = TheatreBundle::new(&tex_handle);
         commands.spawn(psy);
         commands.spawn(theatre);

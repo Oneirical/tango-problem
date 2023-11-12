@@ -4,9 +4,11 @@ use bevy::prelude::*;
 use bevy::sprite::Anchor::BottomLeft;
 use bevy_tweening::lens::TransformPositionLens;
 use bevy_tweening::{Animator, Tween, EaseFunction};
+use rand::Rng;
 
 use crate::SpriteSheetHandle;
 use crate::nn::Net;
+use crate::timeline::{PLAY_AREA_HEIGHT, PLAY_AREA_WIDTH};
 
 pub struct PsychicPlugin;
 
@@ -25,6 +27,14 @@ pub struct PsychicBundle {
     position: Position,
     trace: Trace,
     name: Name,
+}
+
+#[derive(Bundle)]
+pub struct MarkerBundle {
+    position: Position,
+    trace: Trace,
+    name: Name,
+    marker: Marker
 }
 
 #[derive(Bundle)]
@@ -69,6 +79,10 @@ impl TheatreBundle {
             name: Name::new("TheatreDisplay")
         }
     }
+    pub fn with_sprite(mut self, s: usize) -> Self { // Absolutely immaculate!
+        self.sprite_bundle.sprite.index = s;
+        self
+    }
 }
 
 impl PsychicBundle { // This is the start of something great. 8th November 2023
@@ -98,8 +112,25 @@ impl PsychicBundle { // This is the start of something great. 8th November 2023
     }
 }
 
+impl MarkerBundle {
+    pub fn new() -> Self{
+        Self{
+            position: Position { x: 0, y: 0, starting_position: (0, 0) },
+            trace: Trace {positions: Vec::new(), shipped_positions: Vec::new()},
+            name: Name::new("Psychic"),
+            marker: Marker {},
+        }
+    }
+    pub fn with_position(mut self, x: u32, y: u32) -> Self { // Absolutely immaculate!
+        self.position.x = x;
+        self.position.y = y;
+        self.position.starting_position = (x, y);
+        self
+    }
+}
+
 #[derive(Component)]
-pub struct Psychic{
+pub struct Marker{
 }
 
 #[derive(Component, Default, Reflect)]
@@ -161,4 +192,9 @@ fn distribute_psychics(
         commands.spawn(psy);
         commands.spawn(theatre);
     }
+    let mut rng = rand::thread_rng();
+    let mark = MarkerBundle::new().with_position(rng.gen_range(0..PLAY_AREA_WIDTH), rng.gen_range(0..PLAY_AREA_HEIGHT));
+    let x_spot = TheatreBundle::new(&tex_handle).with_sprite(1);
+    commands.spawn(mark);
+    commands.spawn(x_spot);
 }

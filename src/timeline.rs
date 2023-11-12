@@ -1,16 +1,16 @@
 use std::{time::Duration, f32::consts::PI};
-use bevy::{prelude::*, utils::dbg};
+use bevy::prelude::*;
 use bevy_tweening::{Animator, EaseFunction, lens::TransformPositionLens, Tween};
-use rand::{distributions::WeightedIndex, prelude::Distribution};
+use rand::{distributions::WeightedIndex, prelude::Distribution, Rng};
 
-use crate::{psychics::{Position, Soul, ActionType, FinishedTrace, Trace, PsychicSettings}, nn::Net};
+use crate::{psychics::{Position, Soul, ActionType, FinishedTrace, Trace, PsychicSettings, Marker}, nn::Net};
 
 pub struct TimePlugin;
 
 impl Plugin for TimePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(TheatreSettings{time_between_turns: Timer::new(Duration::from_millis(200), TimerMode::Repeating), current_turn: 0, max_turn_number: 100});
-        app.insert_resource(SimulationSettings{max_turn_number: 100, current_turn: 0, current_generation: 0});
+        app.insert_resource(SimulationSettings{max_turn_number: 100, current_turn: 100, current_generation: 0});
         app.add_systems(Update, time_passes);
         app.add_systems(Update, simulate_generation);
         app.add_systems(Update, ship_gen_to_theatre);
@@ -83,13 +83,19 @@ fn evolve_generation(
     mut config: ResMut<SimulationSettings>,
     mut psychics: Query<(&mut Position, &mut Soul, &mut Trace)>,
     psy_settings: Res<PsychicSettings>,
+    mut mark: Query<(&mut Position, &mut Trace), (Without<Soul>, With<Marker>)>,
 
 ){
     if config.current_turn < config.max_turn_number{
         return;
     }
-    config.current_turn = 0;
-    config.current_generation += 1;
+    let mut rng = rand::thread_rng();
+    for (mut pos, mut trace) in mark.iter_mut(){
+        (pos.x, pos.y) = (rng.gen_range(0..PLAY_AREA_WIDTH), rng.gen_range(0..PLAY_AREA_HEIGHT));
+        trace.shipped_positions = trace.positions.clone();
+        trace.positions = Vec::with_capacity(config.max_turn_number);
+        trace.positions.push(pos.starting_position);
+    }
     let mut all_souls: Vec<Net> = Vec::with_capacity(psy_settings.number_at_start as usize); 
     let mut all_fitnesses: Vec<f32> = Vec::with_capacity(psy_settings.number_at_start as usize);
     for (mut position, mut soul, mut trace) in psychics.iter_mut(){
@@ -97,14 +103,15 @@ fn evolve_generation(
         match position.x {
             1..=43 => match position.y {
                 1..=43 => final_fitness = final_fitness,
-                _ => final_fitness = final_fitness * 0.5,
+                _ => final_fitness *= 0.3,
             },
-            _ => final_fitness = final_fitness * 0.5
+            _ => final_fitness *= 0.3
         }
-        // 
         soul.fitness = final_fitness;
         trace.shipped_positions = trace.positions.clone();
+        trace.positions = Vec::with_capacity(config.max_turn_number);
         (position.x, position.y) = position.starting_position;
+        trace.positions.push(position.starting_position);
         all_souls.push(soul.nn.clone());
         all_fitnesses.push(final_fitness);
     }
@@ -117,6 +124,8 @@ fn evolve_generation(
         rand_soul.mutate();
         soul.nn = rand_soul;
     }
+    config.current_turn = 0;
+    config.current_generation += 1;
 }
 
 fn create_gene_pool(values: Vec<f32>) -> (f32, WeightedIndex<f32>) {
@@ -153,37 +162,40 @@ fn locate_quadrant(
         false => theta = ((dy) as f32).atan2(dx as f32) * (180./PI),
     }
     match theta < 0.{
-        true => theta = 360.+theta,
+        true => theta += 360.,
         false=> theta = theta
     }
     let result = theta as u32;
     match result {
-        45..=134 => return [0., 1., 0., 0.].to_vec(),
-        135..=224 => return [0., 0., 1., 0.].to_vec(),
-        225..=315 => return [1., 0., 0., 0.].to_vec(),
-        _ => return [0., 0., 0., 1.].to_vec()
-    };
+        45..=134 => [0., 1., 0., 0.].to_vec(),
+        135..=224 => [0., 0., 1., 0.].to_vec(),
+        225..=315 => [1., 0., 0., 0.].to_vec(),
+        _ => [0., 0., 0., 1.].to_vec()
+    }
 }
 
 fn simulate_generation( // Trying hard to make this concurrent with time_passes. Not sure if it will work. 10th November 2023
     mut config: ResMut<SimulationSettings>,
     mut psychics: Query<(&mut Position, &mut Soul, &mut Trace)>,
+    mut hylics: Query<(&mut Position, &mut Trace), Without<Soul>>,
 ){    
-    assert!(config.current_turn < config.max_turn_number);
     if config.current_turn == config.max_turn_number{
         return;
     }
+    assert!(config.current_turn < config.max_turn_number);
     for turn in 0..config.max_turn_number+1{
         for (mut position, mut soul, mut trace) in psychics.iter_mut(){
             config.current_turn = turn;
-            if config.current_turn == 0 {
-                trace.positions = Vec::with_capacity(config.max_turn_number);
-            }
-            soul.senses_input = locate_quadrant(position.x, position.y, 15, 5);
+            soul.senses_input = locate_quadrant(position.x, position.y, 2, 28);
             soul.decision_outputs = soul.nn.decide(&soul.senses_input);
             let index_of_biggest = soul.decision_outputs.iter().enumerate().fold((0, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
             let final_decision = soul.action_choices[index_of_biggest.0];
             let (checked_new_x, checked_new_y) = process_motion(position.x, position.y, final_decision);
+            (position.x, position.y) = (checked_new_x, checked_new_y);
+            trace.positions.push((position.x, position.y));
+        }
+        for (mut position, mut trace) in hylics.iter_mut(){
+            let (checked_new_x, checked_new_y) = process_motion(position.x, position.y, ActionType::Wait);
             (position.x, position.y) = (checked_new_x, checked_new_y);
             trace.positions.push((position.x, position.y));
         }

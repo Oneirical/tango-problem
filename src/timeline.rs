@@ -90,7 +90,9 @@ fn evolve_generation(
         return;
     }
     let mut rng = rand::thread_rng();
+    let mut beacon_of_light: (u32, u32) = (0,0); // Very gory when more Hylics will get added.
     for (mut pos, mut trace) in mark.iter_mut(){
+        beacon_of_light = (pos.x, pos.y);
         (pos.x, pos.y) = (rng.gen_range(0..PLAY_AREA_WIDTH), rng.gen_range(0..PLAY_AREA_HEIGHT));
         trace.shipped_positions = trace.positions.clone();
         trace.positions = Vec::with_capacity(config.max_turn_number);
@@ -99,13 +101,13 @@ fn evolve_generation(
     let mut all_souls: Vec<Net> = Vec::with_capacity(psy_settings.number_at_start as usize); 
     let mut all_fitnesses: Vec<f32> = Vec::with_capacity(psy_settings.number_at_start as usize);
     for (mut position, mut soul, mut trace) in psychics.iter_mut(){
-        let mut final_fitness = ((position.x as i32 - 5).abs() + (position.y as i32 - 5).abs()) as f32;
+        let mut final_fitness = ((position.x as i32 - beacon_of_light.0 as i32).abs() + (position.y as i32 - beacon_of_light.1 as i32).abs()) as f32;
         match position.x {
             1..=43 => match position.y {
                 1..=43 => final_fitness = final_fitness,
-                _ => final_fitness *= 0.3,
+                _ => final_fitness *= 0.1,
             },
-            _ => final_fitness *= 0.3
+            _ => final_fitness *= 0.1
         }
         soul.fitness = final_fitness;
         trace.shipped_positions = trace.positions.clone();
@@ -184,18 +186,20 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
     }
     assert!(config.current_turn < config.max_turn_number);
     for turn in 0..config.max_turn_number+1{
+        let mut beacon_of_light: (u32, u32) = (0,0); // Very gory when more Hylics will get added.
+        for (mut position, mut trace) in hylics.iter_mut(){
+            let (checked_new_x, checked_new_y) = process_motion(position.x, position.y, ActionType::Wait);
+            (position.x, position.y) = (checked_new_x, checked_new_y);
+            trace.positions.push((position.x, position.y));
+            beacon_of_light = (position.x, position.y);
+        }
         for (mut position, mut soul, mut trace) in psychics.iter_mut(){
             config.current_turn = turn;
-            soul.senses_input = locate_quadrant(position.x, position.y, 2, 28);
+            soul.senses_input = locate_quadrant(position.x, position.y, beacon_of_light.0, beacon_of_light.1);
             soul.decision_outputs = soul.nn.decide(&soul.senses_input);
             let index_of_biggest = soul.decision_outputs.iter().enumerate().fold((0, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
             let final_decision = soul.action_choices[index_of_biggest.0];
             let (checked_new_x, checked_new_y) = process_motion(position.x, position.y, final_decision);
-            (position.x, position.y) = (checked_new_x, checked_new_y);
-            trace.positions.push((position.x, position.y));
-        }
-        for (mut position, mut trace) in hylics.iter_mut(){
-            let (checked_new_x, checked_new_y) = process_motion(position.x, position.y, ActionType::Wait);
             (position.x, position.y) = (checked_new_x, checked_new_y);
             trace.positions.push((position.x, position.y));
         }

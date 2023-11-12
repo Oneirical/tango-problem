@@ -41,6 +41,11 @@ impl Net {
         if inputs.len() != self.n_inputs {
             panic!("Bad input size");
         }
+        for i in inputs{
+            if i > &1.0 || i < &0.{
+                panic!("Incorrect input");
+            }
+        }
 
         let mut outputs = Vec::new();
         outputs.push(inputs.clone());

@@ -101,7 +101,7 @@ fn evolve_generation(
     let mut all_souls: Vec<Net> = Vec::with_capacity(psy_settings.number_at_start as usize); 
     let mut all_fitnesses: Vec<f32> = Vec::with_capacity(psy_settings.number_at_start as usize);
     for (mut position, mut soul, mut trace) in psychics.iter_mut(){
-        let mut final_fitness = ((position.x as i32 - beacon_of_light.0 as i32).abs() + (position.y as i32 - beacon_of_light.1 as i32).abs()) as f32;
+        let mut final_fitness = 90.-((position.x as i32 - beacon_of_light.0 as i32).abs() + (position.y as i32 - beacon_of_light.1 as i32).abs()) as f32;
         match position.x {
             1..=43 => match position.y {
                 1..=43 => final_fitness = final_fitness,

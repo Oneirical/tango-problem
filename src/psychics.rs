@@ -92,11 +92,11 @@ impl PsychicBundle { // This is the start of something great. 8th November 2023
                 nn: Net::new(vec![
                     4_usize,
                     15,
-                    4,
+                    5,
                 ]),
                 senses_input: Vec::new(),
                 decision_outputs: Vec::new(), 
-                action_choices: vec![ActionType::North, ActionType::South, ActionType::West, ActionType::East],
+                action_choices: vec![ActionType::North, ActionType::South, ActionType::West, ActionType::East, ActionType::Wait],
                 fitness: 0.
             },
             position: Position { x: 0, y: 0, starting_position: (0, 0) },

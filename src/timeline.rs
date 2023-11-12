@@ -101,17 +101,7 @@ fn evolve_generation(
     let mut all_souls: Vec<Net> = Vec::with_capacity(psy_settings.number_at_start as usize); 
     let mut all_fitnesses: Vec<f32> = Vec::with_capacity(psy_settings.number_at_start as usize);
     for (mut position, mut soul, mut trace) in psychics.iter_mut(){
-        let mut final_fitness = 20.-((position.x as i32 - beacon_of_light.0 as i32).abs() + (position.y as i32 - beacon_of_light.1 as i32).abs()) as f32;
-        if final_fitness < 0.{
-            final_fitness = 1.
-        }
-        match position.x {
-            1..=43 => match position.y {
-                1..=43 => final_fitness = final_fitness,
-                _ => final_fitness *= 0.1,
-            },
-            _ => final_fitness *= 0.1
-        }
+        let final_fitness = 1./((position.x as i32 - beacon_of_light.0 as i32).abs() + (position.y as i32 - beacon_of_light.1 as i32).abs() + 1) as f32;
         soul.fitness = final_fitness;
         trace.shipped_positions = trace.positions.clone();
         trace.positions = Vec::with_capacity(config.max_turn_number);
@@ -168,15 +158,25 @@ fn locate_quadrant(
     }
     match theta < 0.{
         true => theta += 360.,
-        false=> theta = theta
+        false=> ()
     }
     let result = theta as u32;
+    let angles = [270, 90, 180, 0];
+    let mut output = [0., 0., 0., 0.];
+    for (i, a) in angles.iter().enumerate(){
+        let mut sense = - (0.55 * (result/100) as f32 - (a/180) as f32).abs() + 1.;
+        if sense < 0. {sense = 0.}
+        output[i] = sense as f64;
+    }
+    output.to_vec()
+    /*
     match result {
         45..=134 => [0., 1., 0., 0.].to_vec(),
         135..=224 => [0., 0., 1., 0.].to_vec(),
         225..=315 => [1., 0., 0., 0.].to_vec(),
         _ => [0., 0., 0., 1.].to_vec()
     }
+    */
 }
 
 fn simulate_generation( // Trying hard to make this concurrent with time_passes. Not sure if it will work. 10th November 2023
@@ -217,7 +217,7 @@ fn time_passes(
     config.time_between_turns.tick(time.delta());
     if config.time_between_turns.finished() {
         for (transform, mut anim, trace) in psychics.iter_mut(){
-            if trace.positions.len() == 0 || config.current_turn >= config.max_turn_number{
+            if trace.positions.is_empty() || config.current_turn >= config.max_turn_number{
                 continue;
             }
             let (x, y) = (trace.positions[config.current_turn].0, trace.positions[config.current_turn].1);

@@ -76,7 +76,6 @@ impl Layer{
         for node in self.nodes.iter() {
             layer_results.push(self.sigmoid(self.dot_prod(&node, &inputs)));
         }
-
         layer_results
     }
     fn mutate(&mut self) {

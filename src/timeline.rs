@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{time::Duration, f32::consts::PI};
 use bevy::{prelude::*, utils::dbg};
 use bevy_tweening::{Animator, EaseFunction, lens::TransformPositionLens, Tween};
 use rand::{distributions::WeightedIndex, prelude::Distribution};
@@ -93,7 +93,15 @@ fn evolve_generation(
     let mut all_souls: Vec<Net> = Vec::with_capacity(psy_settings.number_at_start as usize); 
     let mut all_fitnesses: Vec<f32> = Vec::with_capacity(psy_settings.number_at_start as usize);
     for (mut position, mut soul, mut trace) in psychics.iter_mut(){
-        let final_fitness = ((position.x as i32 - 5).abs() + (position.y as i32 - 5).abs()) as f32;
+        let mut final_fitness = ((position.x as i32 - 5).abs() + (position.y as i32 - 5).abs()) as f32;
+        match position.x {
+            1..=43 => match position.y {
+                1..=43 => final_fitness = final_fitness,
+                _ => final_fitness = final_fitness * 0.5,
+            },
+            _ => final_fitness = final_fitness * 0.5
+        }
+        // 
         soul.fitness = final_fitness;
         trace.shipped_positions = trace.positions.clone();
         (position.x, position.y) = position.starting_position;
@@ -128,6 +136,35 @@ fn create_gene_pool(values: Vec<f32>) -> (f32, WeightedIndex<f32>) {
     )
 }
 
+fn locate_quadrant(
+    ori_x: u32,
+    ori_y: u32,
+    dest_x: u32,
+    dest_y: u32,
+) -> Vec<f64> {
+    let dx = dest_x as i32-ori_x as i32;
+    let dy = dest_y as i32-ori_y as i32;
+    let mut theta: f32;
+    match dx == 0{
+        true => match dy > 0 {
+            true => theta = 90.,
+            false => theta = 270.,
+        }
+        false => theta = ((dy) as f32).atan2(dx as f32) * (180./PI),
+    }
+    match theta < 0.{
+        true => theta = 360.+theta,
+        false=> theta = theta
+    }
+    let result = theta as u32;
+    match result {
+        45..=134 => return [0., 1., 0., 0.].to_vec(),
+        135..=224 => return [0., 0., 1., 0.].to_vec(),
+        225..=315 => return [1., 0., 0., 0.].to_vec(),
+        _ => return [0., 0., 0., 1.].to_vec()
+    };
+}
+
 fn simulate_generation( // Trying hard to make this concurrent with time_passes. Not sure if it will work. 10th November 2023
     mut config: ResMut<SimulationSettings>,
     mut psychics: Query<(&mut Position, &mut Soul, &mut Trace)>,
@@ -142,7 +179,7 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
             if config.current_turn == 0 {
                 trace.positions = Vec::with_capacity(config.max_turn_number);
             }
-            soul.senses_input = vec![(position.x/PLAY_AREA_WIDTH).into(), (position.y/PLAY_AREA_HEIGHT).into()];
+            soul.senses_input = locate_quadrant(position.x, position.y, 15, 5);
             soul.decision_outputs = soul.nn.decide(&soul.senses_input);
             let index_of_biggest = soul.decision_outputs.iter().enumerate().fold((0, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
             let final_decision = soul.action_choices[index_of_biggest.0];

@@ -76,13 +76,13 @@ impl PsychicBundle { // This is the start of something great. 8th November 2023
         Self{
             soul: Soul {                 
                 nn: Net::new(vec![
-                    2_usize,
+                    4_usize,
                     15,
-                    5,
+                    4,
                 ]),
                 senses_input: Vec::new(),
                 decision_outputs: Vec::new(), 
-                action_choices: vec![ActionType::North, ActionType::South, ActionType::West, ActionType::East, ActionType::Wait],
+                action_choices: vec![ActionType::North, ActionType::South, ActionType::West, ActionType::East],
                 fitness: 0.
             },
             position: Position { x: 0, y: 0, starting_position: (0, 0) },
@@ -100,10 +100,6 @@ impl PsychicBundle { // This is the start of something great. 8th November 2023
 
 #[derive(Component)]
 pub struct Psychic{
-}
-
-#[derive(Component)]
-pub struct InTheatre{
 }
 
 #[derive(Component, Default, Reflect)]

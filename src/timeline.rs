@@ -180,6 +180,7 @@ fn locate_quadrant(
 }
 
 fn simulate_generation( // Trying hard to make this concurrent with time_passes. Not sure if it will work. 10th November 2023
+    // In order to make effects and spells happen: make a vector of (position, effect). Then, at the start of next turn, make them all happen. 12th November 2023
     mut config: ResMut<SimulationSettings>,
     mut psychics: Query<(&mut Position, &mut Soul, &mut Trace)>,
     mut hylics: Query<(&mut Position, &mut Trace), Without<Soul>>,

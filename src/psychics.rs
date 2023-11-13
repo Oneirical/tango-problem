@@ -6,9 +6,10 @@ use bevy_tweening::lens::TransformPositionLens;
 use bevy_tweening::{Animator, Tween, EaseFunction};
 use rand::Rng;
 
+use crate::map::{Map, CreatureType};
 use crate::SpriteSheetHandle;
 use crate::nn::Net;
-use crate::timeline::{PLAY_AREA_HEIGHT, PLAY_AREA_WIDTH};
+use crate::timeline::{PLAY_AREA_HEIGHT, PLAY_AREA_WIDTH, TILE_SIZE};
 
 pub struct PsychicPlugin;
 
@@ -81,6 +82,18 @@ impl TheatreBundle {
     }
     pub fn with_sprite(mut self, s: usize) -> Self { // Absolutely immaculate!
         self.sprite_bundle.sprite.index = s;
+        self
+    }
+    pub fn with_position(mut self, x: u32, y: u32) -> Self {
+        let tween = Tween::new(
+            EaseFunction::QuadraticInOut,
+            Duration::from_millis(1000),
+            TransformPositionLens {
+                start: Vec3::ZERO,
+                end: Vec3::new(TILE_SIZE * x as f32, TILE_SIZE * y as f32, 0.)
+            },
+        );
+        self.animation = Animator::new(tween);
         self
     }
 }
@@ -179,6 +192,7 @@ fn distribute_psychics(
     mut commands: Commands,
     psy_settings: Res<PsychicSettings>,
     tex_handle: Res<SpriteSheetHandle>,
+    map: Res<Map>,
     //settings: &mut Settings,
     //soul: Option<Vec<NeuNet>>,
 ){
@@ -197,4 +211,16 @@ fn distribute_psychics(
     let x_spot = TheatreBundle::new(&tex_handle).with_sprite(1);
     commands.spawn(mark);
     commands.spawn(x_spot);
+    for y in 0..PLAY_AREA_HEIGHT {
+        for x in 0..PLAY_AREA_WIDTH {
+            let idx = map.xy_idx(x, y);
+            let tile = &map.tiles[idx];
+            dbg!(tile);
+            if tile == &CreatureType::Wall{
+                dbg!(x,y);
+                let wall = TheatreBundle::new(&tex_handle).with_sprite(3).with_position(x, y);
+                commands.spawn(wall);
+            }
+        }
+    }
 }

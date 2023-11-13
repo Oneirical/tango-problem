@@ -3,9 +3,11 @@ mod timeline;
 mod ui;
 mod nn;
 mod util;
+mod map;
 
 use bevy::prelude::*;
 use bevy_tweening::TweeningPlugin;
+use map::MapPlugin;
 use psychics::PsychicPlugin;
 use ui::UIPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
@@ -32,6 +34,7 @@ fn main() {
         .add_systems(PreStartup, load_spritesheet)
         .add_systems(Startup, load_camera)
         .add_plugins(TweeningPlugin)
+        .add_plugins(MapPlugin)
         .add_plugins(UIPlugin)
         .add_plugins(PsychicPlugin)
         .add_plugins(TimePlugin)

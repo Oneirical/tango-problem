@@ -1,18 +1,20 @@
 mod psychics;
-mod timeline;
+mod theatre;
 mod ui;
 mod nn;
 mod util;
 mod map;
 mod axiom;
+mod simulation;
 
 use bevy::prelude::*;
 use bevy_tweening::TweeningPlugin;
 use map::MapPlugin;
 use psychics::PsychicPlugin;
+use simulation::SimulationPlugin;
 use ui::UIPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use timeline::TimePlugin;
+use theatre::TheatrePlugin;
 use bevy::input::common_conditions::input_toggle_active;
 
 fn main() {
@@ -38,7 +40,8 @@ fn main() {
         .add_plugins(MapPlugin)
         .add_plugins(UIPlugin)
         .add_plugins(PsychicPlugin)
-        .add_plugins(TimePlugin)
+        .add_plugins(SimulationPlugin)
+        .add_plugins(TheatrePlugin)
         .add_plugins(
             WorldInspectorPlugin::default().run_if(input_toggle_active(true, KeyCode::Escape)),
         )

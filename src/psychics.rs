@@ -10,7 +10,8 @@ use crate::axiom::{Axiom, AxiomKit};
 use crate::map::{Map, CreatureType};
 use crate::SpriteSheetHandle;
 use crate::nn::Net;
-use crate::timeline::{PLAY_AREA_HEIGHT, PLAY_AREA_WIDTH, TILE_SIZE};
+use crate::simulation::{PLAY_AREA_HEIGHT, PLAY_AREA_WIDTH};
+use crate::theatre::TILE_SIZE;
 
 pub struct PsychicPlugin;
 

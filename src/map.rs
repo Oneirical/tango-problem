@@ -1,7 +1,7 @@
 use rand::Rng;
 use bevy::prelude::*;
 
-use crate::timeline::{PLAY_AREA_WIDTH, PLAY_AREA_HEIGHT};
+use crate::simulation::{PLAY_AREA_WIDTH, PLAY_AREA_HEIGHT};
 
 pub struct MapPlugin;
 

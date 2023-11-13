@@ -31,7 +31,7 @@ fn build(
             let roll = rng.gen_range(0..100);
             let idx = map.xy_idx(x, y);
             let edge = x == 0 || y == 0 || y == PLAY_AREA_HEIGHT-1 || x == PLAY_AREA_WIDTH-1;
-            if roll > 55 || edge { map.tiles[idx] = CreatureType::Wall }
+            if roll > 85 || edge { map.tiles[idx] = CreatureType::Wall }
         }
     }
     for _i in 0..15 {

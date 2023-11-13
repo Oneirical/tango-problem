@@ -6,6 +6,7 @@ use bevy_tweening::lens::TransformPositionLens;
 use bevy_tweening::{Animator, Tween, EaseFunction};
 use rand::Rng;
 
+use crate::axiom::{Axiom, AxiomKit};
 use crate::map::{Map, CreatureType};
 use crate::SpriteSheetHandle;
 use crate::nn::Net;
@@ -31,11 +32,10 @@ pub struct PsychicBundle {
 }
 
 #[derive(Bundle)]
-pub struct MarkerBundle {
+pub struct HylicBundle {
     position: Position,
     trace: Trace,
     name: Name,
-    marker: Marker
 }
 
 #[derive(Bundle)]
@@ -46,7 +46,7 @@ pub struct TheatreBundle {
     name: Name
 }
 
-impl TheatreBundle {
+impl TheatreBundle { // Creatures displayed on screen.
     pub fn new(
         tex_handle: &SpriteSheetHandle
     ) -> Self {
@@ -98,7 +98,8 @@ impl TheatreBundle {
     }
 }
 
-impl PsychicBundle { // This is the start of something great. 8th November 2023
+impl PsychicBundle { // Creatures simulated in the genetic process.
+    // This is the start of something great. 8th November 2023
     pub fn new() -> Self {
         Self{
             soul: Soul {                 
@@ -109,7 +110,7 @@ impl PsychicBundle { // This is the start of something great. 8th November 2023
                 ]),
                 senses_input: Vec::new(),
                 decision_outputs: Vec::new(), 
-                action_choices: vec![ActionType::North, ActionType::South, ActionType::West, ActionType::East, ActionType::Wait],
+                action_choices: Vec::new(),
                 fitness: 0.
             },
             position: Position { x: 0, y: 0, starting_position: (0, 0) },
@@ -123,15 +124,25 @@ impl PsychicBundle { // This is the start of something great. 8th November 2023
         self.position.starting_position = (x, y);
         self
     }
+    pub fn with_axiom_kits(mut self, kits: Vec<AxiomKit>) -> Self{
+        for kit in kits{
+            self.soul.action_choices.append(&mut kit.unpack());
+        }
+        self.soul.nn = Net::new(vec![
+            4_usize, // This will have to be adapted to the number of Senses.
+            15,
+            self.soul.action_choices.len(),
+        ]);
+        self
+    }
 }
 
-impl MarkerBundle {
+impl HylicBundle { // Creatures without a neural network, who present challenges for the Psychics.
     pub fn new() -> Self{
         Self{
             position: Position { x: 0, y: 0, starting_position: (0, 0) },
             trace: Trace {positions: Vec::new(), shipped_positions: Vec::new()},
-            name: Name::new("Psychic"),
-            marker: Marker {},
+            name: Name::new("Hylic"),
         }
     }
     pub fn with_position(mut self, x: u32, y: u32) -> Self { // Absolutely immaculate!
@@ -152,17 +163,8 @@ pub struct Soul{
     pub nn: Net,
     pub decision_outputs: Vec<f64>,
     pub senses_input: Vec<f64>,
-    pub action_choices: Vec<ActionType>,
+    pub action_choices: Vec<Axiom>,
     pub fitness: f32,
-}
-
-#[derive(Clone, Copy, Reflect)]
-pub enum ActionType{
-    North,
-    South,
-    West,
-    East,
-    Wait
 }
 
 #[derive(Resource)]
@@ -201,13 +203,14 @@ fn distribute_psychics(
         let x = i % 4;
         let y = (i as f32/ 4.).floor() as u32;
         let psy = PsychicBundle::new()
-            .with_position(21+x, 21+y);
+            .with_position(21+x, 21+y)
+            .with_axiom_kits(vec![AxiomKit::Motion]);
         let theatre = TheatreBundle::new(&tex_handle);
         commands.spawn(psy);
         commands.spawn(theatre);
     }
     let mut rng = rand::thread_rng();
-    let mark = MarkerBundle::new().with_position(rng.gen_range(0..PLAY_AREA_WIDTH), rng.gen_range(0..PLAY_AREA_HEIGHT));
+    let mark = HylicBundle::new().with_position(rng.gen_range(0..PLAY_AREA_WIDTH), rng.gen_range(0..PLAY_AREA_HEIGHT));
     let x_spot = TheatreBundle::new(&tex_handle).with_sprite(1);
     commands.spawn(mark);
     commands.spawn(x_spot);
@@ -215,9 +218,7 @@ fn distribute_psychics(
         for x in 0..PLAY_AREA_WIDTH {
             let idx = map.xy_idx(x, y);
             let tile = &map.tiles[idx];
-            dbg!(tile);
             if tile == &CreatureType::Wall{
-                dbg!(x,y);
                 let wall = TheatreBundle::new(&tex_handle).with_sprite(3).with_position(x, y);
                 commands.spawn(wall);
             }

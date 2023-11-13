@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use bevy_tweening::{Animator, EaseFunction, lens::TransformPositionLens, Tween};
 use rand::{distributions::WeightedIndex, prelude::Distribution, Rng};
 
-use crate::{psychics::{Position, Soul, ActionType, FinishedTrace, Trace, PsychicSettings, Marker}, nn::Net};
+use crate::{psychics::{Position, Soul, FinishedTrace, Trace, PsychicSettings, Marker}, nn::Net, axiom::Axiom};
 
 pub struct TimePlugin;
 
@@ -36,23 +36,6 @@ pub struct SimulationSettings {
     pub max_turn_number: usize,
     pub current_turn: usize,
     pub current_generation: usize
-}
-
-fn process_motion(
-    cur_x: u32,
-    cur_y: u32,
-    action: ActionType
-) -> (u32, u32){
-    let mut dx = 0;
-    let mut dy = 0;
-    match action {
-        ActionType::North => dy = 1,
-        ActionType::South => dy = -1,
-        ActionType::West => dx = 1,
-        ActionType::East => dx = -1,
-        _ => dx = 0,
-    }
-    (process_x(cur_x as i32 + dx) as u32, process_y(cur_y as i32 + dy) as u32)
 }
 
 fn ship_gen_to_theatre(
@@ -179,10 +162,29 @@ fn locate_quadrant(
     */
 }
 
+fn process_motion(
+    cur_x: u32,
+    cur_y: u32,
+    action: Axiom
+) -> (u32, u32){
+    let (dx, dy) = action.act_motion();
+    (process_x(cur_x as i32 + dx) as u32, process_y(cur_y as i32 + dy) as u32)
+}
+
+fn perform_action<'a>(
+    mut position: Mut<'a, Position>,
+    mut trace: Mut<'a, Trace>,
+    action: Axiom,
+) -> (Mut<'a, Position>, Mut<'a, Trace>) {
+    (position.x, position.y) = process_motion(position.x, position.y, action);
+    trace.positions.push((position.x, position.y));
+    (position, trace)
+}
+
 fn simulate_generation( // Trying hard to make this concurrent with time_passes. Not sure if it will work. 10th November 2023
     // In order to make effects and spells happen: make a vector of (position, effect). Then, at the start of next turn, make them all happen. 12th November 2023
     mut config: ResMut<SimulationSettings>,
-    mut psychics: Query<(&mut Position, &mut Soul, &mut Trace)>,
+    mut psychics: Query<(&mut Position, &mut Soul, &mut Trace), With<Soul>>,
     mut hylics: Query<(&mut Position, &mut Trace), Without<Soul>>,
 ){    
     if config.current_turn == config.max_turn_number{
@@ -192,9 +194,7 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
     for turn in 0..config.max_turn_number+1{
         let mut beacon_of_light: (u32, u32) = (0,0); // Very gory when more Hylics will get added.
         for (mut position, mut trace) in hylics.iter_mut(){
-            let (checked_new_x, checked_new_y) = process_motion(position.x, position.y, ActionType::Wait);
-            (position.x, position.y) = (checked_new_x, checked_new_y);
-            trace.positions.push((position.x, position.y));
+            (position, trace) = perform_action(position, trace, Axiom::Move { dx: 0, dy: 0 });
             beacon_of_light = (position.x, position.y);
         }
         for (mut position, mut soul, mut trace) in psychics.iter_mut(){
@@ -203,9 +203,7 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
             soul.decision_outputs = soul.nn.decide(&soul.senses_input);
             let index_of_biggest = soul.decision_outputs.iter().enumerate().fold((0, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
             let final_decision = soul.action_choices[index_of_biggest.0];
-            let (checked_new_x, checked_new_y) = process_motion(position.x, position.y, final_decision);
-            (position.x, position.y) = (checked_new_x, checked_new_y);
-            trace.positions.push((position.x, position.y));
+            (position, trace) = perform_action(position, trace, final_decision);
         }
     }
 }

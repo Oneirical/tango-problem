@@ -2,7 +2,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 use bevy_tweening::{Animator, EaseFunction, lens::TransformPositionLens, Tween};
 
-use crate::psychics::{FinishedTrace, Trace, PsychicSettings};
+use crate::{psychics::{FinishedTrace, Trace, PsychicSettings}, map::Species};
 
 pub struct TheatrePlugin;
 
@@ -24,8 +24,8 @@ pub struct TheatreSettings {
 }
 
 fn ship_gen_to_theatre(
-    ship: Query<&Trace>,
-    mut theatre: Query<&mut FinishedTrace>,
+    ship: Query<(&Trace, &Species)>,
+    mut theatre: Query<(&mut FinishedTrace, &Species)>,
     keys: Res<Input<KeyCode>>,
     psy_sets: Res<PsychicSettings>,
     mut config: ResMut<TheatreSettings>,
@@ -34,11 +34,19 @@ fn ship_gen_to_theatre(
         return;
     }
     let mut all_positions = Vec::with_capacity(psy_sets.number_at_start as usize);
-    for tracer in ship.iter(){
-        all_positions.push(tracer.shipped_positions.clone());
+    for (tracer, species) in ship.iter(){
+        all_positions.push((tracer.shipped_positions.clone(), species));
     }
-    for (i, mut displayed) in theatre.iter_mut().enumerate(){
-        displayed.positions = all_positions[i].clone();
+    for (mut displayed, species) in theatre.iter_mut(){ // Ferris, forgive me for what just unfolded here - 13th of November, 2023
+        let mut index = 0;
+        for (p, s) in all_positions.clone(){
+            if s == species{
+                displayed.positions = p.clone();
+                break;
+            }
+            index += 1;
+        }
+        all_positions.remove(index);
     }
     config.current_turn = 0;
 }
@@ -46,11 +54,11 @@ fn ship_gen_to_theatre(
 fn time_passes(
     time: Res<Time>,
     mut config: ResMut<TheatreSettings>,
-    mut psychics: Query<(&Transform, &mut Animator<Transform>, &FinishedTrace)>, // Later on, Has<Soul> could be good for non-nn creatures?
+    mut theatre_actors: Query<(&Transform, &mut Animator<Transform>, &FinishedTrace)>,
 ){
     config.time_between_turns.tick(time.delta());
     if config.time_between_turns.finished() {
-        for (transform, mut anim, trace) in psychics.iter_mut(){
+        for (transform, mut anim, trace) in theatre_actors.iter_mut(){
             if trace.positions.is_empty() || config.current_turn >= config.max_turn_number{
                 continue;
             }

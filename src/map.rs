@@ -1,4 +1,4 @@
-use rand::Rng;
+use rand::{Rng, seq::IteratorRandom, thread_rng};
 use bevy::prelude::*;
 
 use crate::simulation::{PLAY_AREA_WIDTH, PLAY_AREA_HEIGHT};
@@ -7,7 +7,6 @@ pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PreStartup, build);
         app.insert_resource(Map::new());
     }
 }
@@ -20,9 +19,10 @@ pub enum Species {
     Beacon,
 }
 
-fn build(
-    mut map: ResMut<Map>,
-) {
+pub fn build_map(
+    parameters: Vec<Species>,
+) -> Vec<Species> {
+    let mut map = Map::new();
     let mut rng = rand::thread_rng();
 
     // First we completely randomize the map, setting 55% of it to be floor.
@@ -58,19 +58,41 @@ fn build(
                 }
             }
         }
-
         map.tiles = newtiles.clone();
     }
+    let mut eligible_spawns = Vec::new();
+    for y in 0..PLAY_AREA_HEIGHT {
+        for x in 0..PLAY_AREA_WIDTH {
+            let idx = map.xy_idx(x, y);
+            if map.tiles[idx] == Species::Nothing{
+                eligible_spawns.push((x,y));
+            }
+        }
+    }
+    let queue_of_species = parameters.clone();
+    for s in queue_of_species{
+        let empty_spaces = eligible_spawns.clone();
+        let (i, t) = empty_spaces.iter().enumerate().choose(&mut thread_rng()).unwrap();
+        eligible_spawns.remove(i);
+        let idx = map.xy_idx(t.0, t.1);
+        map.tiles[idx] = s;
+    }
+    map.tiles
 }
 
 #[derive(Resource)]
 pub(crate) struct Map {
     pub tiles: Vec<Species>,
+    pub population: Vec<Species>,
 }
 
 impl Map{
     fn new() -> Self{
-        let mut new_map = Self { tiles: Vec::with_capacity((PLAY_AREA_HEIGHT*PLAY_AREA_WIDTH) as usize) };
+        let mut recipe = vec![Species::Beacon];
+        for _i in 0..15{
+            recipe.push(Species::Psychic);
+        }
+        let mut new_map = Self { tiles: Vec::with_capacity((PLAY_AREA_HEIGHT*PLAY_AREA_WIDTH) as usize), population: recipe };
         for _i in 0..PLAY_AREA_HEIGHT*PLAY_AREA_WIDTH{
             new_map.tiles.push(Species::Nothing);
         }

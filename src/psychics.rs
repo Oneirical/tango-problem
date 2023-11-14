@@ -7,7 +7,7 @@ use bevy_tweening::{Animator, Tween, EaseFunction};
 use rand::Rng;
 
 use crate::axiom::{Axiom, AxiomKit};
-use crate::map::{Map, Species};
+use crate::map::{Map, Species, build_map};
 use crate::SpriteSheetHandle;
 use crate::nn::Net;
 use crate::simulation::{PLAY_AREA_HEIGHT, PLAY_AREA_WIDTH};
@@ -46,7 +46,8 @@ pub struct TheatreBundle {
     sprite_bundle: SpriteSheetBundle,
     animation: Animator<Transform>,
     finished_trace: FinishedTrace,
-    name: Name
+    name: Name,
+    species: Species
 }
 
 impl TheatreBundle { // Creatures displayed on screen.
@@ -80,7 +81,8 @@ impl TheatreBundle { // Creatures displayed on screen.
             },
             animation: Animator::new(tween),
             finished_trace: FinishedTrace{positions: Vec::new()},
-            name: Name::new("TheatreDisplay")
+            name: Name::new("TheatreDisplay"),
+            species: Species::Wall
         }
     }
     pub fn with_sprite(mut self, s: usize) -> Self { // Absolutely immaculate!
@@ -97,6 +99,10 @@ impl TheatreBundle { // Creatures displayed on screen.
             },
         );
         self.animation = Animator::new(tween);
+        self
+    }
+    pub fn with_species(mut self, species: Species) -> Self {
+        self.species = species;
         self
     }
 }
@@ -205,38 +211,40 @@ pub struct FinishedTrace{
 
 fn distribute_psychics(
     mut commands: Commands,
-    psy_settings: Res<PsychicSettings>,
     tex_handle: Res<SpriteSheetHandle>,
-    map: Res<Map>,
+    mut map: ResMut<Map>,
     //settings: &mut Settings,
     //soul: Option<Vec<NeuNet>>,
 ){
-    let psy_amount = psy_settings.number_at_start;
-    for i in 0..psy_amount{
-        let x = i % 4;
-        let y = (i as f32/ 4.).floor() as u32;
-        let psy = PsychicBundle::new()
-            .with_position(21+x, 21+y)
-            .with_axiom_kits(vec![AxiomKit::Motion])
-            .with_species(Species::Psychic);
-        let theatre = TheatreBundle::new(&tex_handle);
-        commands.spawn(psy);
-        commands.spawn(theatre);
-    }
-    let mut rng = rand::thread_rng();
-    let mark = HylicBundle::new().with_position(rng.gen_range(0..PLAY_AREA_WIDTH), rng.gen_range(0..PLAY_AREA_HEIGHT)).with_species(Species::Beacon);
-    let x_spot = TheatreBundle::new(&tex_handle).with_sprite(1);
-    commands.spawn(mark);
-    commands.spawn(x_spot);
+    map.tiles = build_map(map.population.clone());
     for y in 0..PLAY_AREA_HEIGHT {
         for x in 0..PLAY_AREA_WIDTH {
             let idx = map.xy_idx(x, y);
             let tile = &map.tiles[idx];
-            if tile == &Species::Wall{
-                let wall_t = TheatreBundle::new(&tex_handle).with_sprite(3).with_position(x, y);
-                let wall = HylicBundle::new().with_position(x, y).with_species(Species::Wall);
-                commands.spawn(wall_t);
-                commands.spawn(wall);
+            match tile {
+                Species::Wall => {
+                    let wall_t = TheatreBundle::new(&tex_handle).with_sprite(3).with_position(x, y).with_species(Species::Wall);
+                    let wall = HylicBundle::new().with_position(x, y).with_species(Species::Wall);
+                    commands.spawn(wall_t);
+                    commands.spawn(wall);
+                },
+                Species::Psychic => {
+                    let psy = PsychicBundle::new()
+                        .with_position(x, y)
+                        .with_axiom_kits(vec![AxiomKit::Motion])
+                        .with_species(Species::Psychic);
+                    let theatre = TheatreBundle::new(&tex_handle).with_species(Species::Psychic);
+                    commands.spawn(psy);
+                    commands.spawn(theatre);
+                },
+                Species::Beacon => {
+                    let mut rng = rand::thread_rng();
+                    let mark = HylicBundle::new().with_position(rng.gen_range(0..PLAY_AREA_WIDTH), rng.gen_range(0..PLAY_AREA_HEIGHT)).with_species(Species::Beacon);
+                    let x_spot = TheatreBundle::new(&tex_handle).with_sprite(1).with_species(Species::Beacon); // sprite and species should probably be merged
+                    commands.spawn(mark);
+                    commands.spawn(x_spot);
+                }
+                _ => ()
             }
         }
     }

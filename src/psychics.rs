@@ -4,7 +4,6 @@ use bevy::prelude::*;
 use bevy::sprite::Anchor::BottomLeft;
 use bevy_tweening::lens::TransformPositionLens;
 use bevy_tweening::{Animator, Tween, EaseFunction};
-use rand::Rng;
 
 use crate::axiom::{Axiom, AxiomKit};
 use crate::map::{Map, Species, build_map};
@@ -238,8 +237,7 @@ fn distribute_psychics(
                     commands.spawn(theatre);
                 },
                 Species::Beacon => {
-                    let mut rng = rand::thread_rng();
-                    let mark = HylicBundle::new().with_position(rng.gen_range(0..PLAY_AREA_WIDTH), rng.gen_range(0..PLAY_AREA_HEIGHT)).with_species(Species::Beacon);
+                    let mark = HylicBundle::new().with_position(x, y).with_species(Species::Beacon);
                     let x_spot = TheatreBundle::new(&tex_handle).with_sprite(1).with_position(x, y).with_species(Species::Beacon); // sprite and species should probably be merged
                     commands.spawn(mark);
                     commands.spawn(x_spot);

@@ -81,7 +81,7 @@ pub fn build_map(
 }
 
 #[derive(Resource)]
-pub(crate) struct Map {
+pub struct Map {
     pub tiles: Vec<Species>,
     pub population: Vec<Species>,
 }
@@ -101,4 +101,8 @@ impl Map{
     pub fn xy_idx(&self, x: u32, y: u32) -> usize {
         (y as usize * PLAY_AREA_WIDTH as usize) + x as usize
     }
+}
+
+pub fn xy_idx(&self, x: u32, y: u32) -> usize {
+    (y as usize * PLAY_AREA_WIDTH as usize) + x as usize
 }

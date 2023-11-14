@@ -12,8 +12,8 @@ impl Plugin for MapPlugin {
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
-pub enum CreatureType {
+#[derive(Component, Clone, PartialEq, Debug)]
+pub enum Species {
     Wall,
     Nothing,
     Psychic,
@@ -31,7 +31,7 @@ fn build(
             let roll = rng.gen_range(0..100);
             let idx = map.xy_idx(x, y);
             let edge = x == 0 || y == 0 || y == PLAY_AREA_HEIGHT-1 || x == PLAY_AREA_WIDTH-1;
-            if roll > 85 || edge { map.tiles[idx] = CreatureType::Wall }
+            if roll > 85 || edge { map.tiles[idx] = Species::Wall }
         }
     }
     for _i in 0..15 {
@@ -41,20 +41,20 @@ fn build(
             for x in 1..PLAY_AREA_WIDTH-1 {
                 let idx = map.xy_idx(x, y);
                 let mut neighbors = 0;
-                if map.tiles[idx - 1] == CreatureType::Wall { neighbors += 1; }
-                if map.tiles[idx + 1] == CreatureType::Wall { neighbors += 1; }
-                if map.tiles[idx - PLAY_AREA_WIDTH as usize] == CreatureType::Wall { neighbors += 1; }
-                if map.tiles[idx + PLAY_AREA_WIDTH as usize] == CreatureType::Wall { neighbors += 1; }
-                if map.tiles[idx - (PLAY_AREA_WIDTH as usize - 1)] == CreatureType::Wall { neighbors += 1; }
-                if map.tiles[idx - (PLAY_AREA_WIDTH as usize + 1)] == CreatureType::Wall { neighbors += 1; }
-                if map.tiles[idx + (PLAY_AREA_WIDTH as usize - 1)] == CreatureType::Wall { neighbors += 1; }
-                if map.tiles[idx + (PLAY_AREA_WIDTH as usize + 1)] == CreatureType::Wall { neighbors += 1; }
+                if map.tiles[idx - 1] == Species::Wall { neighbors += 1; }
+                if map.tiles[idx + 1] == Species::Wall { neighbors += 1; }
+                if map.tiles[idx - PLAY_AREA_WIDTH as usize] == Species::Wall { neighbors += 1; }
+                if map.tiles[idx + PLAY_AREA_WIDTH as usize] == Species::Wall { neighbors += 1; }
+                if map.tiles[idx - (PLAY_AREA_WIDTH as usize - 1)] == Species::Wall { neighbors += 1; }
+                if map.tiles[idx - (PLAY_AREA_WIDTH as usize + 1)] == Species::Wall { neighbors += 1; }
+                if map.tiles[idx + (PLAY_AREA_WIDTH as usize - 1)] == Species::Wall { neighbors += 1; }
+                if map.tiles[idx + (PLAY_AREA_WIDTH as usize + 1)] == Species::Wall { neighbors += 1; }
 
                 if neighbors > 4 || neighbors == 0 {
-                    newtiles[idx] = CreatureType::Wall;
+                    newtiles[idx] = Species::Wall;
                 }
                 else {
-                    newtiles[idx] = CreatureType::Nothing;
+                    newtiles[idx] = Species::Nothing;
                 }
             }
         }
@@ -65,14 +65,14 @@ fn build(
 
 #[derive(Resource)]
 pub(crate) struct Map {
-    pub tiles: Vec<CreatureType>,
+    pub tiles: Vec<Species>,
 }
 
 impl Map{
     fn new() -> Self{
         let mut new_map = Self { tiles: Vec::with_capacity((PLAY_AREA_HEIGHT*PLAY_AREA_WIDTH) as usize) };
         for _i in 0..PLAY_AREA_HEIGHT*PLAY_AREA_WIDTH{
-            new_map.tiles.push(CreatureType::Nothing);
+            new_map.tiles.push(Species::Nothing);
         }
         new_map
     }

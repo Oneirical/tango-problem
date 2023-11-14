@@ -34,15 +34,11 @@ fn ship_gen_to_theatre(
         return;
     }
     let mut all_positions = Vec::with_capacity(psy_sets.number_at_start as usize);
-    let mut index_num = 0;
     for tracer in ship.iter(){
         all_positions.push(tracer.shipped_positions.clone());
-        index_num += 1;
     }
-    index_num = 0;
-    for mut displayed in theatre.iter_mut(){
-        displayed.positions = all_positions[index_num].clone();
-        index_num += 1;
+    for (i, mut displayed) in theatre.iter_mut().enumerate(){
+        displayed.positions = all_positions[i].clone();
     }
     config.current_turn = 0;
 }

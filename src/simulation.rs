@@ -2,7 +2,7 @@ use std::f32::consts::PI;
 use bevy::prelude::*;
 use rand::{distributions::WeightedIndex, prelude::Distribution, Rng};
 
-use crate::{psychics::{Position, Soul, Trace, PsychicSettings, Marker}, nn::Net, axiom::Axiom};
+use crate::{psychics::{Position, Soul, Trace, PsychicSettings}, nn::Net, axiom::Axiom, map::Species};
 
 pub struct SimulationPlugin;
 
@@ -30,17 +30,22 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
     // In order to make effects and spells happen: make a vector of (position, effect). Then, at the start of next turn, make them all happen. 12th November 2023
     mut config: ResMut<SimulationSettings>,
     mut psychics: Query<(&mut Position, &mut Soul, &mut Trace), With<Soul>>,
-    mut hylics: Query<(&mut Position, &mut Trace), Without<Soul>>,
+    mut hylics: Query<(&mut Position, &mut Trace, &Species), Without<Soul>>,
 ){    
     if config.current_turn == config.max_turn_number{
         return;
     }
     assert!(config.current_turn < config.max_turn_number);
     for turn in 0..config.max_turn_number+1{
-        let mut beacon_of_light: (u32, u32) = (0,0); // Very gory when more Hylics will get added.
-        for (mut position, mut trace) in hylics.iter_mut(){
-            (position, trace) = perform_action(position, trace, Axiom::Move { dx: 0, dy: 0 });
-            beacon_of_light = (position.x, position.y);
+        let mut beacon_of_light: (u32, u32) = (0,0);
+        for (mut position, mut trace, species) in hylics.iter_mut(){
+            let action = Axiom::Move { dx: 0, dy: 0 };
+            (position.x, position.y) = process_motion(position.x, position.y, action);
+            trace.positions.push((position.x, position.y));
+            match species{
+                Species::Beacon => beacon_of_light = (position.x, position.y),
+                _ => ()
+            }
         }
         for (mut position, mut soul, mut trace) in psychics.iter_mut(){
             config.current_turn = turn;
@@ -48,19 +53,10 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
             soul.decision_outputs = soul.nn.decide(&soul.senses_input);
             let index_of_biggest = soul.decision_outputs.iter().enumerate().fold((0, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
             let final_decision = soul.action_choices[index_of_biggest.0];
-            (position, trace) = perform_action(position, trace, final_decision);
+            (position.x, position.y) = process_motion(position.x, position.y, final_decision);
+            trace.positions.push((position.x, position.y));
         }
     }
-}
-
-fn perform_action<'a>(
-    mut position: Mut<'a, Position>,
-    mut trace: Mut<'a, Trace>,
-    action: Axiom,
-) -> (Mut<'a, Position>, Mut<'a, Trace>) {
-    (position.x, position.y) = process_motion(position.x, position.y, action);
-    trace.positions.push((position.x, position.y));
-    (position, trace)
 }
 
 pub fn process_x(new_pos: i32) -> i32 {
@@ -125,9 +121,9 @@ fn locate_quadrant( // Move this to a Senses file later
 
 fn evolve_generation(
     mut config: ResMut<SimulationSettings>,
-    mut psychics: Query<(&mut Position, &mut Soul, &mut Trace)>,
+    mut psychics: Query<(&mut Position, &mut Soul, &mut Trace), With<Soul>>,
     psy_settings: Res<PsychicSettings>,
-    mut mark: Query<(&mut Position, &mut Trace), (Without<Soul>, With<Marker>)>,
+    mut hylics: Query<(&mut Position, &mut Trace, &Species), Without<Soul>>,
 
 ){
     if config.current_turn < config.max_turn_number{
@@ -135,8 +131,11 @@ fn evolve_generation(
     }
     let mut rng = rand::thread_rng();
     let mut beacon_of_light: (u32, u32) = (0,0); // Very gory when more Hylics will get added.
-    for (mut pos, mut trace) in mark.iter_mut(){
-        beacon_of_light = (pos.x, pos.y);
+    for (mut pos, mut trace, species) in hylics.iter_mut(){
+        match species{
+            Species::Beacon => beacon_of_light = (pos.x, pos.y),
+            _ => ()
+        }
         (pos.x, pos.y) = (rng.gen_range(0..PLAY_AREA_WIDTH), rng.gen_range(0..PLAY_AREA_HEIGHT));
         trace.shipped_positions = trace.positions.clone();
         trace.positions = Vec::with_capacity(config.max_turn_number);

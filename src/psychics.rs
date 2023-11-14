@@ -7,7 +7,7 @@ use bevy_tweening::{Animator, Tween, EaseFunction};
 use rand::Rng;
 
 use crate::axiom::{Axiom, AxiomKit};
-use crate::map::{Map, CreatureType};
+use crate::map::{Map, Species};
 use crate::SpriteSheetHandle;
 use crate::nn::Net;
 use crate::simulation::{PLAY_AREA_HEIGHT, PLAY_AREA_WIDTH};
@@ -30,6 +30,7 @@ pub struct PsychicBundle {
     position: Position,
     trace: Trace,
     name: Name,
+    species: Species,
 }
 
 #[derive(Bundle)]
@@ -37,6 +38,7 @@ pub struct HylicBundle {
     position: Position,
     trace: Trace,
     name: Name,
+    species: Species
 }
 
 #[derive(Bundle)]
@@ -116,7 +118,8 @@ impl PsychicBundle { // Creatures simulated in the genetic process.
             },
             position: Position { x: 0, y: 0, starting_position: (0, 0) },
             trace: Trace {positions: Vec::new(), shipped_positions: Vec::new()},
-            name: Name::new("Psychic")
+            name: Name::new("Psychic"),
+            species: Species::Wall
         }
     }
     pub fn with_position(mut self, x: u32, y: u32) -> Self { // Absolutely immaculate!
@@ -136,6 +139,10 @@ impl PsychicBundle { // Creatures simulated in the genetic process.
         ]);
         self
     }
+    pub fn with_species(mut self, species: Species) -> Self {
+        self.species = species;
+        self
+    }
 }
 
 impl HylicBundle { // Creatures without a neural network, who present challenges for the Psychics.
@@ -144,12 +151,17 @@ impl HylicBundle { // Creatures without a neural network, who present challenges
             position: Position { x: 0, y: 0, starting_position: (0, 0) },
             trace: Trace {positions: Vec::new(), shipped_positions: Vec::new()},
             name: Name::new("Hylic"),
+            species: Species::Wall
         }
     }
     pub fn with_position(mut self, x: u32, y: u32) -> Self { // Absolutely immaculate!
         self.position.x = x;
         self.position.y = y;
         self.position.starting_position = (x, y);
+        self
+    }
+    pub fn with_species(mut self, species: Species) -> Self {
+        self.species = species;
         self
     }
 }
@@ -205,13 +217,14 @@ fn distribute_psychics(
         let y = (i as f32/ 4.).floor() as u32;
         let psy = PsychicBundle::new()
             .with_position(21+x, 21+y)
-            .with_axiom_kits(vec![AxiomKit::Motion]);
+            .with_axiom_kits(vec![AxiomKit::Motion])
+            .with_species(Species::Psychic);
         let theatre = TheatreBundle::new(&tex_handle);
         commands.spawn(psy);
         commands.spawn(theatre);
     }
     let mut rng = rand::thread_rng();
-    let mark = HylicBundle::new().with_position(rng.gen_range(0..PLAY_AREA_WIDTH), rng.gen_range(0..PLAY_AREA_HEIGHT));
+    let mark = HylicBundle::new().with_position(rng.gen_range(0..PLAY_AREA_WIDTH), rng.gen_range(0..PLAY_AREA_HEIGHT)).with_species(Species::Beacon);
     let x_spot = TheatreBundle::new(&tex_handle).with_sprite(1);
     commands.spawn(mark);
     commands.spawn(x_spot);
@@ -219,8 +232,10 @@ fn distribute_psychics(
         for x in 0..PLAY_AREA_WIDTH {
             let idx = map.xy_idx(x, y);
             let tile = &map.tiles[idx];
-            if tile == &CreatureType::Wall{
-                let wall = TheatreBundle::new(&tex_handle).with_sprite(3).with_position(x, y);
+            if tile == &Species::Wall{
+                let wall_t = TheatreBundle::new(&tex_handle).with_sprite(3).with_position(x, y);
+                let wall = HylicBundle::new().with_position(x, y).with_species(Species::Wall);
+                commands.spawn(wall_t);
                 commands.spawn(wall);
             }
         }

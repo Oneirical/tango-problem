@@ -233,14 +233,14 @@ fn distribute_psychics(
                         .with_position(x, y)
                         .with_axiom_kits(vec![AxiomKit::Motion])
                         .with_species(Species::Psychic);
-                    let theatre = TheatreBundle::new(&tex_handle).with_species(Species::Psychic);
+                    let theatre = TheatreBundle::new(&tex_handle).with_position(x, y).with_species(Species::Psychic);
                     commands.spawn(psy);
                     commands.spawn(theatre);
                 },
                 Species::Beacon => {
                     let mut rng = rand::thread_rng();
                     let mark = HylicBundle::new().with_position(rng.gen_range(0..PLAY_AREA_WIDTH), rng.gen_range(0..PLAY_AREA_HEIGHT)).with_species(Species::Beacon);
-                    let x_spot = TheatreBundle::new(&tex_handle).with_sprite(1).with_species(Species::Beacon); // sprite and species should probably be merged
+                    let x_spot = TheatreBundle::new(&tex_handle).with_sprite(1).with_position(x, y).with_species(Species::Beacon); // sprite and species should probably be merged
                     commands.spawn(mark);
                     commands.spawn(x_spot);
                 }

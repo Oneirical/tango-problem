@@ -2,7 +2,7 @@ use std::f32::consts::PI;
 use bevy::prelude::*;
 use rand::{distributions::WeightedIndex, prelude::Distribution};
 
-use crate::{psychics::{Position, Soul, Trace, PsychicSettings}, nn::Net, axiom::Axiom, map::{Map, Species, build_map}};
+use crate::{psychics::{Position, Soul, Trace, PsychicSettings}, nn::Net, axiom::Axiom, map::{Map, Species, build_map, xy_idx}};
 
 pub struct SimulationPlugin;
 
@@ -37,11 +37,11 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
         return;
     }
     assert!(config.current_turn < config.max_turn_number);
-    for turn in 0..config.max_turn_number+1{
+    //for turn in 0..config.max_turn_number+1{
         let mut beacon_of_light: (u32, u32) = (0,0);
         for (mut position, mut trace, species) in hylics.iter_mut(){
             let action = Axiom::Move { dx: 0, dy: 0 };
-            (position.x, position.y) = process_motion(position.x, position.y, action, map.tiles);
+            (position.x, position.y) = process_motion(position.x, position.y, action, map.tiles.clone());
             trace.positions.push((position.x, position.y));
             match species{
                 Species::Beacon => beacon_of_light = (position.x, position.y),
@@ -49,15 +49,15 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
             }
         }
         for (mut position, mut soul, mut trace) in psychics.iter_mut(){
-            config.current_turn = turn;
+            config.current_turn += 1;
             soul.senses_input = locate_quadrant(position.x, position.y, beacon_of_light.0, beacon_of_light.1);
             soul.decision_outputs = soul.nn.decide(&soul.senses_input);
             let index_of_biggest = soul.decision_outputs.iter().enumerate().fold((0, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
             let final_decision = soul.action_choices[index_of_biggest.0];
-            (position.x, position.y) = process_motion(position.x, position.y, final_decision, map.tiles);
+            (position.x, position.y) = process_motion(position.x, position.y, final_decision, map.tiles.clone());
             trace.positions.push((position.x, position.y));
         }
-    }
+    //}
 }
 
 pub fn process_x(new_pos: i32) -> i32 {
@@ -84,7 +84,7 @@ pub fn target_is_empty(
     new_pos: (u32, u32),
     collision_map: Vec<Species>,
 ) -> bool {
-    let idx = xy_idx(pos.0, pos.1);
+    let idx = xy_idx(new_pos.0, new_pos.1);
     if collision_map[idx] == Species::Nothing{
         true
     }
@@ -146,27 +146,23 @@ fn evolve_generation(
     if config.current_turn < config.max_turn_number{
         return;
     }
-    map.tiles = build_map(map.population.clone());
-    let mut placed_coords = Vec::new();
+    (map.tiles, map.catalogue, map.locations) = build_map(map.population.clone());
     let mut beacon_of_light: (u32, u32) = (0,0); // Very gory when more Hylics will get added.
     for (mut pos, mut trace, species) in hylics.iter_mut(){
-        for y in 0..PLAY_AREA_HEIGHT {
-            for x in 0..PLAY_AREA_WIDTH {
-                let idx = map.xy_idx(x, y);
-                let tile = &map.tiles[idx];
-                if species == tile && !placed_coords.contains(&(x,y)) {
-                    (pos.x, pos.y) = (x, y);
-                    trace.shipped_positions = trace.positions.clone();
-                    trace.positions = Vec::with_capacity(config.max_turn_number);
-                    trace.positions.push((x, y));
-                    placed_coords.push((x, y));
-                    match species{
-                        Species::Beacon => beacon_of_light = (pos.x, pos.y),
-                        _ => ()
-                    }
-                    break;
-                }
-            }
+        trace.shipped_positions = trace.positions.clone();
+        trace.positions = Vec::with_capacity(config.max_turn_number);
+        let index = map.catalogue.iter().position(|r| r == species).unwrap();
+        if map.locations[index].is_empty(){
+            trace.positions.push((0, 0));
+            // Super gory. Since we're always stuck with too many walls, some of them can't find a position and get tucked in a stack in the corner instead. Fix this.
+            break;
+        }
+        let Some((x,y)) = map.locations[index].pop() else { panic!("Locations assigment did not find an XY pair.") };
+        (pos.x, pos.y) = (x, y);
+        trace.positions.push((x, y));
+        match species{
+            Species::Beacon => beacon_of_light = (pos.x, pos.y),
+            _ => ()
         }
     }
     let mut all_souls: Vec<Net> = Vec::with_capacity(psy_settings.number_at_start as usize); 
@@ -175,20 +171,17 @@ fn evolve_generation(
         let final_fitness = 1./((pos.x as i32 - beacon_of_light.0 as i32).abs() + (pos.y as i32 - beacon_of_light.1 as i32).abs() + 1) as f32;
         soul.fitness = final_fitness;
 
-        for y in 0..PLAY_AREA_HEIGHT {
-            for x in 0..PLAY_AREA_WIDTH {
-                let idx = map.xy_idx(x, y);
-                let tile = &map.tiles[idx];
-                if species == tile && !placed_coords.contains(&(x,y)) {
-                    (pos.x, pos.y) = (x, y);
-                    trace.shipped_positions = trace.positions.clone();
-                    trace.positions = Vec::with_capacity(config.max_turn_number);
-                    trace.positions.push((x, y));
-                    placed_coords.push((x, y));
-                    break;
-                }
-            }
+        let index = map.catalogue.iter().position(|r| r == species).unwrap();
+        let Some((x,y)) = map.locations[index].pop() else { panic!("Locations assigment did not find an XY pair.") };
+        (pos.x, pos.y) = (x, y);
+        trace.shipped_positions = trace.positions.clone();
+        trace.positions = Vec::with_capacity(config.max_turn_number);
+        trace.positions.push((x, y));
+        match species{
+            Species::Beacon => beacon_of_light = (pos.x, pos.y),
+            _ => ()
         }
+
         all_souls.push(soul.nn.clone());
         all_fitnesses.push(final_fitness);
     }

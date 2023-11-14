@@ -215,7 +215,7 @@ fn distribute_psychics(
     //settings: &mut Settings,
     //soul: Option<Vec<NeuNet>>,
 ){
-    map.tiles = build_map(map.population.clone());
+    (map.tiles, map.catalogue, map.locations) = build_map(map.population.clone());
     for y in 0..PLAY_AREA_HEIGHT {
         for x in 0..PLAY_AREA_WIDTH {
             let idx = map.xy_idx(x, y);

@@ -59,7 +59,7 @@ fn time_passes(
     config.time_between_turns.tick(time.delta());
     if config.time_between_turns.finished() {
         for (transform, mut anim, trace) in theatre_actors.iter_mut(){
-            if trace.positions.is_empty() || config.current_turn >= config.max_turn_number{
+            if trace.positions.len() <= config.current_turn || config.current_turn >= config.max_turn_number{
                 continue;
             }
             let (x, y) = (trace.positions[config.current_turn].0, trace.positions[config.current_turn].1);

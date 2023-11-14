@@ -21,7 +21,7 @@ pub enum Species {
 
 pub fn build_map(
     parameters: Vec<Species>,
-) -> Vec<Species> {
+) -> (Vec<Species>, Vec<Species>,  Vec<Vec<(u32,u32)>>){
     let mut map = Map::new();
     let mut rng = rand::thread_rng();
 
@@ -60,6 +60,8 @@ pub fn build_map(
         }
         map.tiles = newtiles.clone();
     }
+    let mut catalogue = vec![Species::Wall];
+    let mut locations = vec![Vec::new()];
     let mut eligible_spawns = Vec::new();
     for y in 0..PLAY_AREA_HEIGHT {
         for x in 0..PLAY_AREA_WIDTH {
@@ -67,6 +69,7 @@ pub fn build_map(
             if map.tiles[idx] == Species::Nothing{
                 eligible_spawns.push((x,y));
             }
+            else { locations[0].push((x, y)) };
         }
     }
     let queue_of_species = parameters.clone();
@@ -75,15 +78,28 @@ pub fn build_map(
         let (i, t) = empty_spaces.iter().enumerate().choose(&mut thread_rng()).unwrap();
         eligible_spawns.remove(i);
         let idx = map.xy_idx(t.0, t.1);
-        map.tiles[idx] = s;
+        map.tiles[idx] = s.clone();
+        if !catalogue.contains(&s){ 
+            catalogue.push(s);
+            locations.push(vec![(t.0,t.1)]);
+        }
+        else {
+            let index = catalogue.iter().position(|r| r == &s).unwrap();
+            locations[index].push((t.0,t.1));
+        }
+
+
     }
-    map.tiles
+    (map.tiles, catalogue, locations)
 }
 
 #[derive(Resource)]
 pub struct Map {
-    pub tiles: Vec<Species>,
-    pub population: Vec<Species>,
+    pub tiles: Vec<Species>, // The tiles on the map.
+    pub population: Vec<Species>, // The list of creatures that get added on it (no walls)
+
+    pub catalogue: Vec<Species>, // The indexer of creature locations.
+    pub locations: Vec<Vec<(u32,u32)>>,
 }
 
 impl Map{
@@ -92,7 +108,7 @@ impl Map{
         for _i in 0..15{
             recipe.push(Species::Psychic);
         }
-        let mut new_map = Self { tiles: Vec::with_capacity((PLAY_AREA_HEIGHT*PLAY_AREA_WIDTH) as usize), population: recipe };
+        let mut new_map = Self { tiles: Vec::with_capacity((PLAY_AREA_HEIGHT*PLAY_AREA_WIDTH) as usize), population: recipe, catalogue: Vec::new(), locations: Vec::new() };
         for _i in 0..PLAY_AREA_HEIGHT*PLAY_AREA_WIDTH{
             new_map.tiles.push(Species::Nothing);
         }
@@ -103,6 +119,6 @@ impl Map{
     }
 }
 
-pub fn xy_idx(&self, x: u32, y: u32) -> usize {
+pub fn xy_idx(x: u32, y: u32) -> usize {
     (y as usize * PLAY_AREA_WIDTH as usize) + x as usize
 }

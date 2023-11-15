@@ -20,7 +20,7 @@ pub enum AxiomKit{
 impl AxiomKit{
     pub fn unpack(self) -> Vec<Axiom>{
         match self{
-            AxiomKit::Motion => vec![Axiom::Move { dx: 0, dy: 1 }, Axiom::Move { dx: 0, dy: -1 }, Axiom::Move { dx: -1, dy: 0 }, Axiom::Move { dx: 1, dy: 0 }, Axiom::Move { dx: 0, dy: 0 }]
+            AxiomKit::Motion => vec![Axiom::Move { dx: 0, dy: 1 }, Axiom::Move { dx: 0, dy: -1 }, Axiom::Move { dx: -1, dy: 0 }, Axiom::Move { dx: 1, dy: 0 }, Axiom::Move { dx: 0, dy: 0 }] // this might not be that good - hard to encourage action diversity by fitness? See Tango Problem
         }
     }
 }

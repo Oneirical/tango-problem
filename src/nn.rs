@@ -63,10 +63,10 @@ impl Net {
 impl Layer{
     fn new(layer_size: usize, prev_layer_size: usize) -> Self {
         let mut rng = rand::thread_rng();
-        let mut nodes: Vec<Vec<f64>> = Vec::new();
+        let mut nodes: Vec<Vec<f64>> = Vec::with_capacity(layer_size);
 
         for _ in 0..layer_size {
-            let mut node: Vec<f64> = Vec::new();
+            let mut node: Vec<f64> = Vec::with_capacity(prev_layer_size);
             for _ in 0..prev_layer_size + 1 {
                 let random_weight: f64 = rng.gen_range(-1.0f64..1.0f64);
                 node.push(random_weight);
@@ -91,7 +91,7 @@ impl Layer{
                     continue;
                 }
 
-                *val += rng.gen_range(-0.5..0.5) as f64;
+                *val += rng.gen_range(-1.5..1.5) as f64;
             }
         }
     }

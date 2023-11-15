@@ -51,6 +51,7 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
         for (mut position, mut soul, mut trace, species) in psychics.iter_mut(){
             soul.senses_input = locate_quadrant(position.x, position.y, beacon_of_light.0, beacon_of_light.1);
             soul.senses_input.append(&mut find_adjacent_collisions((position.x, position.y), &map.tiles));
+            soul.senses_input.append(&mut vec![10./(9.+((position.x as i32 - beacon_of_light.0 as i32).abs() + (position.y as i32 - beacon_of_light.1 as i32).abs()) as f64)]);
             soul.decision_outputs = soul.nn.decide(&soul.senses_input);
             let index_of_biggest = soul.decision_outputs.iter().enumerate().fold((0, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
             let final_decision = soul.action_choices[index_of_biggest.0];

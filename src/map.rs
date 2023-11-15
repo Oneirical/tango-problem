@@ -105,7 +105,7 @@ pub struct Map {
 impl Map{
     fn new() -> Self{
         let mut recipe = vec![Species::Beacon];
-        for _i in 0..64{
+        for _i in 0..32{
             recipe.push(Species::Psychic);
         }
         let mut new_map = Self { tiles: Vec::with_capacity((PLAY_AREA_HEIGHT*PLAY_AREA_WIDTH) as usize), population: recipe, catalogue: Vec::new(), locations: Vec::new() };

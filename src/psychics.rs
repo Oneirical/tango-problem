@@ -119,6 +119,7 @@ impl PsychicBundle { // Creatures simulated in the genetic process.
                 senses_input: Vec::new(),
                 decision_outputs: Vec::new(), 
                 action_choices: Vec::new(),
+                actions_chosen: Vec::new(),
                 fitness: 0.
             },
             position: Position { x: 0, y: 0, starting_position: (0, 0) },
@@ -182,6 +183,7 @@ pub struct Soul{
     pub decision_outputs: Vec<f64>,
     pub senses_input: Vec<f64>,
     pub action_choices: Vec<Axiom>,
+    pub actions_chosen: Vec<(i32, i32)>,
     pub fitness: f32,
 }
 
@@ -212,10 +214,9 @@ fn distribute_psychics(
     mut commands: Commands,
     tex_handle: Res<SpriteSheetHandle>,
     mut map: ResMut<Map>,
-    //settings: &mut Settings,
-    //soul: Option<Vec<NeuNet>>,
 ){
-    (map.tiles, map.catalogue, map.locations) = build_map(map.population.clone());
+
+    (map.tiles, map.catalogue, map.locations) = build_map(map.population.clone()); // TODO: Make a set of possible maps and starting locations, then ship that and stop generating stuff when we're busy enough training the NN.
     for y in 0..PLAY_AREA_HEIGHT {
         for x in 0..PLAY_AREA_WIDTH {
             let idx = map.xy_idx(x, y);

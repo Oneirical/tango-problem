@@ -37,11 +37,11 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
         return;
     }
     assert!(config.current_turn < config.max_turn_number);
-    //for turn in 0..config.max_turn_number+1{
+    for turn in 0..config.max_turn_number+1{
         let mut beacon_of_light: (u32, u32) = (0,0);
         for (mut position, mut trace, species) in hylics.iter_mut(){
             let action = Axiom::Move { dx: 0, dy: 0 };
-            (position.x, position.y) = process_motion(position.x, position.y, action, map.tiles.clone());
+            (position.x, position.y) = process_motion(position.x, position.y, action, &map.tiles);
             trace.positions.push((position.x, position.y));
             match species{
                 Species::Beacon => beacon_of_light = (position.x, position.y),
@@ -49,15 +49,16 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
             }
         }
         for (mut position, mut soul, mut trace) in psychics.iter_mut(){
-            config.current_turn += 1;
             soul.senses_input = locate_quadrant(position.x, position.y, beacon_of_light.0, beacon_of_light.1);
             soul.decision_outputs = soul.nn.decide(&soul.senses_input);
             let index_of_biggest = soul.decision_outputs.iter().enumerate().fold((0, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
             let final_decision = soul.action_choices[index_of_biggest.0];
-            (position.x, position.y) = process_motion(position.x, position.y, final_decision, map.tiles.clone());
+            if !soul.actions_chosen.contains(&final_decision.act_motion()){ soul.actions_chosen.push(final_decision.act_motion())};
+            (position.x, position.y) = process_motion(position.x, position.y, final_decision, &map.tiles);
             trace.positions.push((position.x, position.y));
         }
-    //}
+        config.current_turn = turn;
+    }
 }
 
 pub fn process_x(new_pos: i32) -> i32 {
@@ -82,24 +83,24 @@ pub fn process_y(new_pos: i32) -> i32 {
 
 pub fn target_is_empty(
     new_pos: (u32, u32),
-    collision_map: Vec<Species>,
+    collision_map: &Vec<Species>,
 ) -> bool {
     let idx = xy_idx(new_pos.0, new_pos.1);
     if collision_map[idx] == Species::Nothing{
         true
     }
-    else { false }
+    else { true }
 }
 
 fn process_motion(
     cur_x: u32,
     cur_y: u32,
     action: Axiom,
-    collision_map: Vec<Species>,
+    collision_map: &Vec<Species>,
 ) -> (u32, u32){
     let (dx, dy) = action.act_motion();
     let new_coords = (process_x(cur_x as i32 + dx) as u32, process_y(cur_y as i32 + dy) as u32);
-    if target_is_empty(new_coords, collision_map){
+    if target_is_empty(new_coords, collision_map) { //
         new_coords
     } else { (cur_x, cur_y) }   
 }
@@ -159,6 +160,7 @@ fn evolve_generation(
         }
         let Some((x,y)) = map.locations[index].pop() else { panic!("Locations assigment did not find an XY pair.") };
         (pos.x, pos.y) = (x, y);
+        pos.starting_position = (x,y);
         trace.positions.push((x, y));
         match species{
             Species::Beacon => beacon_of_light = (pos.x, pos.y),
@@ -167,13 +169,37 @@ fn evolve_generation(
     }
     let mut all_souls: Vec<Net> = Vec::with_capacity(psy_settings.number_at_start as usize); 
     let mut all_fitnesses: Vec<f32> = Vec::with_capacity(psy_settings.number_at_start as usize);
+    let mut best_fit = (0., 0);
     for (mut pos, mut soul, mut trace, species) in psychics.iter_mut(){
-        let final_fitness = 1./((pos.x as i32 - beacon_of_light.0 as i32).abs() + (pos.y as i32 - beacon_of_light.1 as i32).abs() + 1) as f32;
+        let mut final_fitness = if (pos.x as i32 - beacon_of_light.0 as i32).abs() < 2 && (pos.y as i32 - beacon_of_light.1 as i32).abs() < 2{
+            100.
+        } else if (pos.x as i32 - beacon_of_light.0 as i32).abs() < 5 && (pos.y as i32 - beacon_of_light.1 as i32).abs() < 5{
+            50.
+        } else if (pos.x as i32 - beacon_of_light.0 as i32).abs() < 10 && (pos.y as i32 - beacon_of_light.1 as i32).abs() < 10{
+            10.
+        } else {
+            1.
+        };
+        //dbg!(soul.actions_chosen.clone());
+        if soul.actions_chosen.len() > 2{
+
+            final_fitness += 1000.;
+        }
+
+        soul.actions_chosen = Vec::new();
+        //30.-((pos.x as i32 - beacon_of_light.0 as i32).abs() + (pos.y as i32 - beacon_of_light.1 as i32).abs()) as f32;
+        if pos.x == 44 || pos.y == 44 || pos.x == 0 || pos.x == 0{
+            final_fitness *= 0.5;
+        }
+        if (pos.x, pos.y) == pos.starting_position{
+            final_fitness = 0.3;
+        }
         soul.fitness = final_fitness;
 
         let index = map.catalogue.iter().position(|r| r == species).unwrap();
         let Some((x,y)) = map.locations[index].pop() else { panic!("Locations assigment did not find an XY pair.") };
         (pos.x, pos.y) = (x, y);
+        pos.starting_position = (x,y);
         trace.shipped_positions = trace.positions.clone();
         trace.positions = Vec::with_capacity(config.max_turn_number);
         trace.positions.push((x, y));
@@ -184,17 +210,20 @@ fn evolve_generation(
 
         all_souls.push(soul.nn.clone());
         all_fitnesses.push(final_fitness);
+        if final_fitness > best_fit.0{
+            best_fit = (final_fitness, all_fitnesses.len()-1);
+        }
     }
     //dbg!(all_fitnesses.clone());
     let (_max_fitness, gene_pool) = create_gene_pool(all_fitnesses);
     let mut rng = rand::thread_rng();
     for (mut _position, mut soul, mut _trace, _species) in psychics.iter_mut(){
         let soul_idx = gene_pool.sample(&mut rng);
-        let mut rand_soul = all_souls[soul_idx].clone();
+        let mut rand_soul = all_souls[soul_idx].clone(); // soul_idx
         rand_soul.mutate();
         soul.nn = rand_soul;
     }
-    config.current_turn = 0;
+    config.current_turn = 0 ;
     config.current_generation += 1;
 }
 

@@ -1,6 +1,6 @@
 use bevy::reflect::Reflect;
 
-#[derive(Clone, Copy, Reflect)]
+#[derive(Clone, PartialEq, Copy, Reflect)]
 pub enum Axiom{
     Move{dx: i32, dy: i32}
 }

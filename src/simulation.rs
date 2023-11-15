@@ -29,9 +29,9 @@ pub struct SimulationSettings {
 fn simulate_generation( // Trying hard to make this concurrent with time_passes. Not sure if it will work. 10th November 2023
     // In order to make effects and spells happen: make a vector of (position, effect). Then, at the start of next turn, make them all happen. 12th November 2023
     mut config: ResMut<SimulationSettings>,
-    mut psychics: Query<(&mut Position, &mut Soul, &mut Trace), With<Soul>>,
+    mut psychics: Query<(&mut Position, &mut Soul, &mut Trace, &Species), With<Soul>>,
     mut hylics: Query<(&mut Position, &mut Trace, &Species), Without<Soul>>,
-    map: Res<Map>,
+    mut map: ResMut<Map>,
 ){    
     if config.current_turn == config.max_turn_number{
         return;
@@ -48,13 +48,18 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
                 _ => ()
             }
         }
-        for (mut position, mut soul, mut trace) in psychics.iter_mut(){
+        for (mut position, mut soul, mut trace, species) in psychics.iter_mut(){
             soul.senses_input = locate_quadrant(position.x, position.y, beacon_of_light.0, beacon_of_light.1);
+            soul.senses_input.append(&mut find_adjacent_collisions((position.x, position.y), &map.tiles));
             soul.decision_outputs = soul.nn.decide(&soul.senses_input);
             let index_of_biggest = soul.decision_outputs.iter().enumerate().fold((0, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
             let final_decision = soul.action_choices[index_of_biggest.0];
             if !soul.actions_chosen.contains(&final_decision.act_motion()){ soul.actions_chosen.push(final_decision.act_motion())};
+            let idx = map.xy_idx(position.x, position.y);
+            map.tiles[idx] = Species::Nothing; // left tile becomes empty
             (position.x, position.y) = process_motion(position.x, position.y, final_decision, &map.tiles);
+            let idx = map.xy_idx(position.x, position.y);
+            map.tiles[idx] = species.clone(); // entered tile becomes full
             trace.positions.push((position.x, position.y));
         }
         config.current_turn = turn;
@@ -81,6 +86,25 @@ pub fn process_y(new_pos: i32) -> i32 {
     }
 }
 
+pub fn find_adjacent_collisions(
+    pos: (u32, u32),
+    collision_map: &Vec<Species>
+) -> Vec<f64>{
+    let mut output = Vec::with_capacity(4);
+    let mut search = Vec::with_capacity(4);
+    for i in [(0,1), (1,0), (-1, 0), (0,-1)]{
+        search.push(i);
+    }
+    for i in search{
+        if target_is_empty(((pos.0 as i32+i.0) as u32, (pos.1 as i32+i.1) as u32), collision_map){
+            output.push(1.);
+        } else {output.push(0.)};
+    }
+    output
+
+}
+
+
 pub fn target_is_empty(
     new_pos: (u32, u32),
     collision_map: &Vec<Species>,
@@ -89,7 +113,7 @@ pub fn target_is_empty(
     if collision_map[idx] == Species::Nothing{
         true
     }
-    else { true }
+    else { false }
 }
 
 fn process_motion(

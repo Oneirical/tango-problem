@@ -62,11 +62,12 @@ fn time_passes(
             if trace.positions.len() <= config.current_turn || config.current_turn >= config.max_turn_number{
                 continue;
             }
+            let anim_time = if config.current_turn == 0 { 500 } else { 199 };
             let (x, y) = (trace.positions[config.current_turn].0, trace.positions[config.current_turn].1);
             let start = transform.translation;
             let tween = Tween::new(
                 EaseFunction::QuadraticInOut,
-                Duration::from_millis(199),
+                Duration::from_millis(anim_time),
                 TransformPositionLens {
                     start,
                     end: Vec3::new(TILE_SIZE * x as f32, TILE_SIZE * y as f32, 0.),

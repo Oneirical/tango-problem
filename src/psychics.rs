@@ -18,8 +18,8 @@ impl Plugin for PsychicPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(PsychicSettings{number_at_start: 16});
         app.add_systems(Startup, distribute_psychics);
-        app.register_type::<Soul>();
-        app.register_type::<Position>();
+        //app.register_type::<Soul>();
+        //app.register_type::<Position>();
     }
 }
 
@@ -176,8 +176,7 @@ impl HylicBundle { // Creatures without a neural network, who present challenges
 pub struct Marker{
 }
 
-#[derive(Component, Default, Reflect)]
-#[reflect(Component)]
+#[derive(Component, Default)]
 pub struct Soul{
     pub nn: Net,
     pub decision_outputs: Vec<f64>,
@@ -231,7 +230,7 @@ fn distribute_psychics(
                 Species::Psychic => {
                     let psy = PsychicBundle::new()
                         .with_position(x, y)
-                        .with_axiom_kits(vec![AxiomKit::Motion])
+                        .with_axiom_kits(vec![AxiomKit::PaintKit])
                         .with_species(Species::Psychic);
                     let theatre = TheatreBundle::new(&tex_handle).with_position(x, y).with_species(Species::Psychic);
                     commands.spawn(psy);

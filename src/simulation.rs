@@ -29,8 +29,9 @@ pub struct SimulationSettings {
 fn simulate_generation( // Trying hard to make this concurrent with time_passes. Not sure if it will work. 10th November 2023
     // In order to make effects and spells happen: make a vector of (position, effect). Then, at the start of next turn, make them all happen. 12th November 2023
     mut config: ResMut<SimulationSettings>,
-    mut psychics: Query<(&mut Position, &mut Soul, &mut Trace, &Species), With<Soul>>,
-    mut hylics: Query<(&mut Position, &mut Trace, &Species), Without<Soul>>,
+    //mut all_creatures: Query<(&mut Position, &mut Trace, &mut Species)>,
+    mut psychics: Query<(&mut Position, &mut Soul, &mut Trace, &mut Species), With<Soul>>,
+    mut hylics: Query<(&mut Position, &mut Trace, &mut Species), Without<Soul>>,
     mut map: ResMut<Map>,
 ){    
     if config.current_turn == config.max_turn_number{
@@ -39,52 +40,56 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
     assert!(config.current_turn < config.max_turn_number);
     for turn in 0..config.max_turn_number+1{
         let mut beacon_of_light: (u32, u32) = (0,0);
-        for (mut position, _trace, species) in hylics.iter_mut(){
+        for (mut position, _trace, mut species) in hylics.iter_mut(){
             // Each entity can do an action by itself.
             map = exit_tile(map, position.x, position.y);
 
             let action = Axiom::Move { dx: 0, dy: 0 };
             (position.x, position.y) = process_motion(position.x, position.y, action, &map.tiles);
+            *species = process_metamorphosis(action, *species);
 
-            map = enter_tile(map, position.x, position.y, species.clone());
+            map = enter_tile(map, position.x, position.y, *species);
 
             // This is terrible and should be removed.
-            match species{
+            match *species{
                 Species::Beacon => beacon_of_light = (position.x, position.y),
                 _ => ()
             }
         }
-        for (mut position, mut soul, mut _trace, species) in psychics.iter_mut(){
+        for (mut position, mut soul, mut _trace, mut species) in psychics.iter_mut(){
             soul.senses_input = locate_quadrant(position.x, position.y, beacon_of_light.0, beacon_of_light.1);
             soul.senses_input.append(&mut find_adjacent_collisions((position.x, position.y), &map.tiles));
             soul.senses_input.append(&mut vec![10./(10.+((position.x as i32 - beacon_of_light.0 as i32).abs() + (position.y as i32 - beacon_of_light.1 as i32).abs()) as f64)]);
             soul.decision_outputs = soul.nn.decide(&soul.senses_input);
             let index_of_biggest = soul.decision_outputs.iter().enumerate().fold((0, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
-            let final_decision = soul.action_choices[index_of_biggest.0];
-            if !soul.actions_chosen.contains(&final_decision.act_motion()){ soul.actions_chosen.push(final_decision.act_motion())};
+            let action = soul.action_choices[index_of_biggest.0];
+            if !soul.actions_chosen.contains(&action.act_motion()){ soul.actions_chosen.push(action.act_motion())};
             // Each entity can do an action by itself.
             map = exit_tile(map, position.x, position.y);
 
-            (position.x, position.y) = process_motion(position.x, position.y, final_decision, &map.tiles);
+            (position.x, position.y) = process_motion(position.x, position.y, action, &map.tiles);
+            *species = process_metamorphosis(action, *species);
 
-            map = enter_tile(map, position.x, position.y, species.clone());
+            map = enter_tile(map, position.x, position.y, *species);
         }
-        for (mut position, mut trace, species) in hylics.iter_mut(){
+        for (mut position, mut trace, mut species) in hylics.iter_mut(){
             map = exit_tile(map, position.x, position.y);
             // Then, the Axiom effects happen.
             let action = grab_axiom_at_pos(&map.axiom_map, (position.x, position.y));
             (position.x, position.y) = process_motion(position.x, position.y, action, &map.tiles);
+            *species = process_metamorphosis(action, *species);
 
-            map = enter_tile(map, position.x, position.y, species.clone());
+            map = enter_tile(map, position.x, position.y, *species);
             trace.positions.push((position.x, position.y));
         }
-        for (mut position, mut _soul, mut trace, species) in psychics.iter_mut(){
+        for (mut position, mut _soul, mut trace, mut species) in psychics.iter_mut(){
             map = exit_tile(map, position.x, position.y);
 
             let action = grab_axiom_at_pos(&map.axiom_map, (position.x, position.y));
             (position.x, position.y) = process_motion(position.x, position.y, action, &map.tiles);
+            *species = process_metamorphosis(action, *species);
 
-            map = enter_tile(map, position.x, position.y, species.clone());
+            map = enter_tile(map, position.x, position.y, *species);
             trace.positions.push((position.x, position.y));
         }
         config.current_turn = turn;
@@ -158,6 +163,11 @@ pub fn target_is_empty(
     let idx = xy_idx(new_pos.0, new_pos.1);
     collision_map[idx] == Species::Nothing
 }
+
+fn process_metamorphosis(
+    action: Axiom,
+    species: Species
+) -> Species {action.act_transform(species)}
 
 fn process_motion(
     cur_x: u32,

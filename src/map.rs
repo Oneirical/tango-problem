@@ -11,7 +11,7 @@ impl Plugin for MapPlugin {
     }
 }
 
-#[derive(Component, Clone, PartialEq, Debug)]
+#[derive(Component, Clone, Copy, PartialEq, Debug)]
 pub enum Species {
     Wall,
     Nothing,
@@ -78,7 +78,7 @@ pub fn build_map(
         let (i, t) = empty_spaces.iter().enumerate().choose(&mut thread_rng()).unwrap();
         eligible_spawns.remove(i);
         let idx = map.xy_idx(t.0, t.1);
-        map.tiles[idx] = s.clone();
+        map.tiles[idx] = s;
         if !catalogue.contains(&s){ 
             catalogue.push(s);
             locations.push(vec![(t.0,t.1)]);

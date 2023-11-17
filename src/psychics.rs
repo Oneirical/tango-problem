@@ -127,7 +127,8 @@ impl PsychicBundle { // Creatures simulated in the genetic process.
                 positions: Vec::with_capacity(MAX_TURN_NUMBER),
                 shipped_positions: Vec::with_capacity(MAX_TURN_NUMBER), 
                 identity: Vec::with_capacity(MAX_TURN_NUMBER), 
-                shipped_identity: Vec::with_capacity(MAX_TURN_NUMBER)
+                shipped_identity: Vec::with_capacity(MAX_TURN_NUMBER),
+                original_species: Species::Wall
             },
             name: Name::new("Psychic"),
             species: Species::Wall
@@ -152,6 +153,7 @@ impl PsychicBundle { // Creatures simulated in the genetic process.
     }
     pub fn with_species(mut self, species: Species) -> Self {
         self.species = species;
+        self.trace.original_species = species;
         self
     }
 }
@@ -164,7 +166,8 @@ impl HylicBundle { // Creatures without a neural network, who present challenges
                 positions: Vec::with_capacity(MAX_TURN_NUMBER),
                 shipped_positions: Vec::with_capacity(MAX_TURN_NUMBER), 
                 identity: Vec::with_capacity(MAX_TURN_NUMBER), 
-                shipped_identity: Vec::with_capacity(MAX_TURN_NUMBER)
+                shipped_identity: Vec::with_capacity(MAX_TURN_NUMBER),
+                original_species: Species::Wall
             },
             name: Name::new("Hylic"),
             species: Species::Wall
@@ -178,6 +181,7 @@ impl HylicBundle { // Creatures without a neural network, who present challenges
     }
     pub fn with_species(mut self, species: Species) -> Self {
         self.species = species;
+        self.trace.original_species = species;
         self
     }
 }
@@ -214,6 +218,7 @@ pub struct Trace{
     pub shipped_positions: Vec<(u32, u32)>,
     pub identity: Vec<Species>,
     pub shipped_identity: Vec<Species>,
+    pub original_species: Species,
 }
 
 #[derive(Component)]

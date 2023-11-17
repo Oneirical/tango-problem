@@ -24,7 +24,7 @@ pub struct TheatreSettings {
 }
 
 fn ship_gen_to_theatre(
-    ship: Query<(&Trace, &Species)>,
+    ship: Query<&Trace>,
     mut theatre: Query<(&mut FinishedTrace, &Species)>,
     keys: Res<Input<KeyCode>>,
     //psy_sets: Res<PsychicSettings>,
@@ -35,14 +35,14 @@ fn ship_gen_to_theatre(
     }
     let mut all_positions = Vec::new();
     let mut all_identity = Vec::new();
-    for (tracer, species) in ship.iter(){
-        all_positions.push((&tracer.shipped_positions, species));
-        all_identity.push((&tracer.shipped_identity, species));
+    for tracer in ship.iter(){
+        all_positions.push((&tracer.shipped_positions, tracer.original_species));
+        all_identity.push((&tracer.shipped_identity, tracer.original_species));
     }
     for (mut displayed, species) in theatre.iter_mut(){ // Ferris, forgive me for what just unfolded here - 13th of November, 2023
         let mut index = 0;
         for (p, s) in all_positions.clone(){
-            if s == species{
+            if s == *species{
                 displayed.positions = p.clone();
                 break;
             }
@@ -52,7 +52,7 @@ fn ship_gen_to_theatre(
 
         index = 0;
         for (p, s) in all_identity.clone(){
-            if s == species{
+            if s == *species{
                 displayed.identity = p.clone();
                 break;
             }
@@ -77,7 +77,7 @@ fn time_passes(
             let anim_time = if config.current_turn == 0 { 500 } else { 199 };
             let (x, y) = (trace.positions[config.current_turn].0, trace.positions[config.current_turn].1);
             let start = transform.translation;
-            let tween = Tween::new(
+            let tween = Tween::new( // Cool rotation if the creature doesn't move or casts an Axiom?
                 EaseFunction::QuadraticInOut,
                 Duration::from_millis(anim_time),
                 TransformPositionLens {
@@ -105,5 +105,6 @@ fn get_texture_id(
         Species::Beacon => 1,
         Species::Psychic => 0,
         Species::Nothing => 2,
+        Species::TermiPainted => 5,
     }
 }

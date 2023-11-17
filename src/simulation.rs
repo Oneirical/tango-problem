@@ -38,7 +38,7 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
         return;
     }
     assert!(config.current_turn < config.max_turn_number);
-    for turn in 0..config.max_turn_number+1{
+    for _turn in 0..50{ // large impact on performance: this number is the simulation speed
         let mut beacon_of_light: (u32, u32) = (0,0);
         for (mut position, _trace, mut species) in hylics.iter_mut(){
             // Each entity can do an action by itself.
@@ -47,6 +47,7 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
             let action = Axiom::Move { dx: 0, dy: 0 };
             (position.x, position.y) = process_motion(position.x, position.y, action, &map.tiles);
             *species = process_metamorphosis(action, *species);
+            map = process_axioms(map, action, (position.x, position.y));
 
             map = enter_tile(map, position.x, position.y, *species);
 
@@ -69,15 +70,17 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
 
             (position.x, position.y) = process_motion(position.x, position.y, action, &map.tiles);
             *species = process_metamorphosis(action, *species);
+            map = process_axioms(map, action, (position.x, position.y));
 
             map = enter_tile(map, position.x, position.y, *species);
         }
         for (mut position, mut trace, mut species) in hylics.iter_mut(){
             map = exit_tile(map, position.x, position.y);
             // Then, the Axiom effects happen.
-            let action = grab_axiom_at_pos(&map.axiom_map, (position.x, position.y));
+            let action = grab_axiom_at_pos(&map.axiom_map, (position.x, position.y)); // This makes it impossible to stack multiple axioms in one location, it might need to be changed to a vector.
             (position.x, position.y) = process_motion(position.x, position.y, action, &map.tiles);
             *species = process_metamorphosis(action, *species);
+            map = process_axioms(map, action, (position.x, position.y));
 
             map = enter_tile(map, position.x, position.y, *species);
             trace.positions.push((position.x, position.y));
@@ -89,13 +92,28 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
             let action = grab_axiom_at_pos(&map.axiom_map, (position.x, position.y));
             (position.x, position.y) = process_motion(position.x, position.y, action, &map.tiles);
             *species = process_metamorphosis(action, *species);
+            map = process_axioms(map, action, (position.x, position.y));
 
             map = enter_tile(map, position.x, position.y, *species);
             trace.positions.push((position.x, position.y));
             trace.identity.push(*species);
         }
-        config.current_turn = turn;
+        config.current_turn += 1;
     }
+}
+
+pub fn process_axioms(
+    mut map: ResMut<Map>,
+    action: Axiom,
+    cur_pos: (u32, u32),
+)-> ResMut<Map>{
+    let effects = action.act_axioms(cur_pos, &map);
+    if effects.is_empty() {return map;}
+    for i in effects{
+        let idx = map.xy_idx(i.1.0, i.1.1);
+        map.axiom_map[idx] = i.0;
+    }
+    map
 }
 
 pub fn process_x(new_pos: i32) -> i32 {
@@ -130,19 +148,29 @@ pub fn exit_tile(mut map: ResMut<Map>, x: u32, y: u32) -> ResMut<Map>{
     map
 }
 
+pub fn get_adjacent_coords(
+    pos: (u32, u32),
+) -> Vec<(u32, u32)>{
+    let mut search = Vec::with_capacity(4);
+    let mut output = Vec::with_capacity(4);
+    for i in [(0,1), (1,0), (-1, 0), (0,-1)]{
+        search.push(i);
+    }
+    for i in search{
+        let new_coords = (process_x(pos.0 as i32+i.0) as u32, process_y(pos.1 as i32+i.1) as u32);
+        output.push(new_coords);
+    }
+    output
+}
+
 
 pub fn find_adjacent_collisions(
     pos: (u32, u32),
     collision_map: &[Species]
 ) -> Vec<f64>{
     let mut output = Vec::with_capacity(4);
-    let mut search = Vec::with_capacity(4);
-    for i in [(0,1), (1,0), (-1, 0), (0,-1)]{
-        search.push(i);
-    }
-    for i in search{
-        let new_coords = (process_x(pos.0 as i32+i.0) as u32, process_y(pos.1 as i32+i.1) as u32);
-        if target_is_empty(new_coords, collision_map){
+    for i in get_adjacent_coords(pos){
+        if target_is_empty(i, collision_map){
             output.push(1.);
         } else {output.push(0.)};
     }
@@ -232,14 +260,17 @@ fn evolve_generation(
         trace.shipped_positions = trace.positions.clone();
         trace.shipped_identity = trace.identity.clone();
         trace.positions = Vec::with_capacity(config.max_turn_number);
-        let index = map.catalogue.iter().position(|r| r == &*species).unwrap();
-        let creature = map.catalogue[index];
+        let creature = trace.original_species;
+        let index = map.catalogue.iter().position(|r| r == &creature).unwrap();
         if map.locations[index].is_empty(){
             trace.positions.push((0, 0));
             // Super gory. Since we're always stuck with too many walls, some of them can't find a position and get tucked in a stack in the corner instead. Fix this.
             break;
         }
-        let Some((x,y)) = map.locations[index].pop() else { panic!("Locations assigment did not find an XY pair.") };
+        let Some((x,y)) = map.locations[index].pop() else { 
+            dbg!(&map.locations[index]);
+            dbg!(index);
+            panic!("Locations assigment did not find an XY pair.") };
         (pos.x, pos.y) = (x, y);
         pos.starting_position = (x,y);
         *species = creature;
@@ -278,10 +309,12 @@ fn evolve_generation(
             final_fitness = 0.3;
         }
         soul.fitness = final_fitness;
-
-        let index = map.catalogue.iter().position(|r| r == &*species).unwrap();
-        let creature = map.catalogue[index];
-        let Some((x,y)) = map.locations[index].pop() else { panic!("Locations assigment did not find an XY pair.") };
+        let creature = trace.original_species;
+        let index = map.catalogue.iter().position(|r| r == &creature).unwrap();
+        let Some((x,y)) = map.locations[index].pop() else { 
+            dbg!(&map.locations[index]);
+            dbg!(index);
+            panic!("Locations assigment did not find an XY pair.") };
         (pos.x, pos.y) = (x, y);
         *species = creature;
         pos.starting_position = (x,y);

@@ -17,6 +17,7 @@ pub enum Species {
     Nothing,
     Psychic,
     Beacon,
+    TermiPainted,
 }
 
 pub fn build_map(

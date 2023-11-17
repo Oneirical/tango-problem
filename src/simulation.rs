@@ -39,28 +39,52 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
     assert!(config.current_turn < config.max_turn_number);
     for turn in 0..config.max_turn_number+1{
         let mut beacon_of_light: (u32, u32) = (0,0);
-        for (mut position, mut trace, species) in hylics.iter_mut(){
+        for (mut position, _trace, species) in hylics.iter_mut(){
+            // Each entity can do an action by itself.
+            map = exit_tile(map, position.x, position.y);
+
             let action = Axiom::Move { dx: 0, dy: 0 };
             (position.x, position.y) = process_motion(position.x, position.y, action, &map.tiles);
-            trace.positions.push((position.x, position.y));
+
+            map = enter_tile(map, position.x, position.y, species.clone());
+
+            // This is terrible and should be removed.
             match species{
                 Species::Beacon => beacon_of_light = (position.x, position.y),
                 _ => ()
             }
         }
-        for (mut position, mut soul, mut trace, species) in psychics.iter_mut(){
+        for (mut position, mut soul, mut _trace, species) in psychics.iter_mut(){
             soul.senses_input = locate_quadrant(position.x, position.y, beacon_of_light.0, beacon_of_light.1);
             soul.senses_input.append(&mut find_adjacent_collisions((position.x, position.y), &map.tiles));
-            soul.senses_input.append(&mut vec![10./(9.+((position.x as i32 - beacon_of_light.0 as i32).abs() + (position.y as i32 - beacon_of_light.1 as i32).abs()) as f64)]);
+            soul.senses_input.append(&mut vec![10./(10.+((position.x as i32 - beacon_of_light.0 as i32).abs() + (position.y as i32 - beacon_of_light.1 as i32).abs()) as f64)]);
             soul.decision_outputs = soul.nn.decide(&soul.senses_input);
             let index_of_biggest = soul.decision_outputs.iter().enumerate().fold((0, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
             let final_decision = soul.action_choices[index_of_biggest.0];
             if !soul.actions_chosen.contains(&final_decision.act_motion()){ soul.actions_chosen.push(final_decision.act_motion())};
-            let idx = map.xy_idx(position.x, position.y);
-            map.tiles[idx] = Species::Nothing; // left tile becomes empty
+            // Each entity can do an action by itself.
+            map = exit_tile(map, position.x, position.y);
+
             (position.x, position.y) = process_motion(position.x, position.y, final_decision, &map.tiles);
-            let idx = map.xy_idx(position.x, position.y);
-            map.tiles[idx] = species.clone(); // entered tile becomes full
+
+            map = enter_tile(map, position.x, position.y, species.clone());
+        }
+        for (mut position, mut trace, species) in hylics.iter_mut(){
+            map = exit_tile(map, position.x, position.y);
+            // Then, the Axiom effects happen.
+            let action = grab_axiom_at_pos(&map.axiom_map, (position.x, position.y));
+            (position.x, position.y) = process_motion(position.x, position.y, action, &map.tiles);
+
+            map = enter_tile(map, position.x, position.y, species.clone());
+            trace.positions.push((position.x, position.y));
+        }
+        for (mut position, mut _soul, mut trace, species) in psychics.iter_mut(){
+            map = exit_tile(map, position.x, position.y);
+
+            let action = grab_axiom_at_pos(&map.axiom_map, (position.x, position.y));
+            (position.x, position.y) = process_motion(position.x, position.y, action, &map.tiles);
+
+            map = enter_tile(map, position.x, position.y, species.clone());
             trace.positions.push((position.x, position.y));
         }
         config.current_turn = turn;
@@ -87,9 +111,22 @@ pub fn process_y(new_pos: i32) -> i32 {
     }
 }
 
+pub fn enter_tile(mut map: ResMut<Map>, x: u32, y: u32, species: Species) -> ResMut<Map>{
+    let idx = map.xy_idx(x, y);
+    map.tiles[idx] = species;
+    map
+}
+
+pub fn exit_tile(mut map: ResMut<Map>, x: u32, y: u32) -> ResMut<Map>{
+    let idx = map.xy_idx(x, y);
+    map.tiles[idx] = Species::Nothing;
+    map
+}
+
+
 pub fn find_adjacent_collisions(
     pos: (u32, u32),
-    collision_map: &Vec<Species>
+    collision_map: &[Species]
 ) -> Vec<f64>{
     let mut output = Vec::with_capacity(4);
     let mut search = Vec::with_capacity(4);
@@ -97,7 +134,8 @@ pub fn find_adjacent_collisions(
         search.push(i);
     }
     for i in search{
-        if target_is_empty(((pos.0 as i32+i.0) as u32, (pos.1 as i32+i.1) as u32), collision_map){
+        let new_coords = (process_x(pos.0 as i32+i.0) as u32, process_y(pos.1 as i32+i.1) as u32);
+        if target_is_empty(new_coords, collision_map){
             output.push(1.);
         } else {output.push(0.)};
     }
@@ -105,23 +143,27 @@ pub fn find_adjacent_collisions(
 
 }
 
+pub fn grab_axiom_at_pos(
+    axiom_map: &[Axiom],
+    pos: (u32, u32),
+) -> Axiom {
+    let idx = xy_idx(pos.0, pos.1);
+    axiom_map[idx]
+}
 
 pub fn target_is_empty(
     new_pos: (u32, u32),
-    collision_map: &Vec<Species>,
+    collision_map: &[Species],
 ) -> bool {
     let idx = xy_idx(new_pos.0, new_pos.1);
-    if collision_map[idx] == Species::Nothing{
-        true
-    }
-    else { false }
+    collision_map[idx] == Species::Nothing
 }
 
 fn process_motion(
     cur_x: u32,
     cur_y: u32,
     action: Axiom,
-    collision_map: &Vec<Species>,
+    collision_map: &[Species],
 ) -> (u32, u32){
     let (dx, dy) = action.act_motion();
     let new_coords = (process_x(cur_x as i32 + dx) as u32, process_y(cur_y as i32 + dy) as u32);
@@ -213,7 +255,7 @@ fn evolve_generation(
 
         soul.actions_chosen = Vec::new();
         //30.-((pos.x as i32 - beacon_of_light.0 as i32).abs() + (pos.y as i32 - beacon_of_light.1 as i32).abs()) as f32;
-        if pos.x == 44 || pos.y == 44 || pos.x == 0 || pos.x == 0{
+        if pos.x == 44 || pos.y == 44 || pos.x == 0 || pos.y == 0{
             final_fitness *= 0.5;
         }
         if (pos.x, pos.y) == pos.starting_position{

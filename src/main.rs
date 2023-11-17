@@ -13,9 +13,9 @@ use map::MapPlugin;
 use psychics::PsychicPlugin;
 use simulation::SimulationPlugin;
 use ui::UIPlugin;
-use bevy_inspector_egui::quick::WorldInspectorPlugin;
+//use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use theatre::TheatrePlugin;
-use bevy::input::common_conditions::input_toggle_active;
+//use bevy::input::common_conditions::input_toggle_active;
 
 fn main() {
     App::new()
@@ -42,9 +42,9 @@ fn main() {
         .add_plugins(PsychicPlugin)
         .add_plugins(SimulationPlugin)
         .add_plugins(TheatrePlugin)
-        .add_plugins(
-            WorldInspectorPlugin::default().run_if(input_toggle_active(true, KeyCode::Escape)),
-        )
+        //.add_plugins(
+        //    WorldInspectorPlugin::default().run_if(input_toggle_active(true, KeyCode::Escape)),
+        //)
         .run();
 }
 

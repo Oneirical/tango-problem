@@ -2,13 +2,15 @@ use bevy::reflect::Reflect;
 
 #[derive(Clone, PartialEq, Copy, Reflect)]
 pub enum Axiom{
-    Move{dx: i32, dy: i32}
+    Move{dx: i32, dy: i32},
+    Void
 }
 
 impl Axiom{
     pub fn act_motion(self) -> (i32, i32) {
         match self{
-            Axiom::Move { dx, dy } => (dx, dy)
+            Axiom::Move { dx, dy } => (dx, dy),
+            _ => (0, 0)
         }
     }
 }

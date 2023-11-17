@@ -1,7 +1,7 @@
 use rand::{Rng, seq::IteratorRandom, thread_rng};
 use bevy::prelude::*;
 
-use crate::simulation::{PLAY_AREA_WIDTH, PLAY_AREA_HEIGHT};
+use crate::{simulation::{PLAY_AREA_WIDTH, PLAY_AREA_HEIGHT}, axiom::Axiom};
 
 pub struct MapPlugin;
 
@@ -96,6 +96,7 @@ pub fn build_map(
 #[derive(Resource)]
 pub struct Map {
     pub tiles: Vec<Species>, // The tiles on the map.
+    pub axiom_map: Vec<Axiom>,
     pub population: Vec<Species>, // The list of creatures that get added on it (no walls)
 
     pub catalogue: Vec<Species>, // The indexer of creature locations.
@@ -108,9 +109,10 @@ impl Map{
         for _i in 0..32{
             recipe.push(Species::Psychic);
         }
-        let mut new_map = Self { tiles: Vec::with_capacity((PLAY_AREA_HEIGHT*PLAY_AREA_WIDTH) as usize), population: recipe, catalogue: Vec::new(), locations: Vec::new() };
+        let mut new_map = Self { tiles: Vec::with_capacity((PLAY_AREA_HEIGHT*PLAY_AREA_WIDTH) as usize), population: recipe, catalogue: Vec::new(), locations: Vec::new(), axiom_map: Vec::with_capacity((PLAY_AREA_HEIGHT*PLAY_AREA_WIDTH) as usize)};
         for _i in 0..PLAY_AREA_HEIGHT*PLAY_AREA_WIDTH{
             new_map.tiles.push(Species::Nothing);
+            new_map.axiom_map.push(Axiom::Void);
         }
         new_map
     }

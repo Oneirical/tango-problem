@@ -43,6 +43,8 @@ impl Net {
         }
         for i in inputs{
             if !(&0. ..=&1.0).contains(&i){
+                dbg!(&i);
+                dbg!(&inputs);
                 panic!("Incorrect input");
             }
         }

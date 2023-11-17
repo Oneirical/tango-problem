@@ -233,7 +233,7 @@ fn distribute_psychics(
     mut map: ResMut<Map>,
 ){
 
-    (map.tiles, map.catalogue, map.locations) = build_map(map.population.clone()); // TODO: Make a set of possible maps and starting locations, then ship that and stop generating stuff when we're busy enough training the NN.
+    (map.tiles, map.catalogue, map.locations, map.axiom_map) = build_map(map.population.clone()); // TODO: Make a set of possible maps and starting locations, then ship that and stop generating stuff when we're busy enough training the NN.
     for y in 0..PLAY_AREA_HEIGHT {
         for x in 0..PLAY_AREA_WIDTH {
             let idx = map.xy_idx(x, y);
@@ -248,7 +248,7 @@ fn distribute_psychics(
                 Species::Psychic => {
                     let psy = PsychicBundle::new()
                         .with_position(x, y)
-                        .with_axiom_kits(vec![AxiomKit::PaintKit])
+                        .with_axiom_kits(vec![AxiomKit::OnlyPaint])
                         .with_species(Species::Psychic);
                     let theatre = TheatreBundle::new(&tex_handle).with_position(x, y).with_species(Species::Psychic);
                     commands.spawn(psy);

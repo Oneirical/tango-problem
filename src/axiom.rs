@@ -2,7 +2,7 @@ use bevy::ecs::system::ResMut;
 
 use crate::{map::{Species, Map}, simulation::get_adjacent_coords};
 
-#[derive(Clone, PartialEq, Copy)]
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub enum Axiom{
     Move{dx: i32, dy: i32},
     PaintAdjacent{ color: Species },
@@ -26,7 +26,7 @@ impl Axiom{
     pub fn act_axioms(
         self,
         pos: (u32, u32),
-        map: &ResMut<Map>,
+        map: &ResMut<Map>, // Don't place stuff that's not on top of an entity, it will stay there.
     ) -> Vec<(Axiom, (u32, u32))>{
         let mut output = Vec::new();
         match self{
@@ -45,7 +45,8 @@ impl Axiom{
 
 pub enum AxiomKit{
     Motion,
-    PaintKit
+    PaintKit,
+    OnlyPaint
 }
 
 impl AxiomKit{
@@ -53,6 +54,7 @@ impl AxiomKit{
         match self{
             AxiomKit::Motion => vec![Axiom::Move { dx: 0, dy: 1 }, Axiom::Move { dx: 0, dy: -1 }, Axiom::Move { dx: -1, dy: 0 }, Axiom::Move { dx: 1, dy: 0 }, Axiom::Move { dx: 0, dy: 0 }], // this might not be that good - hard to encourage action diversity by fitness? See Tango Problem
             AxiomKit::PaintKit => vec![Axiom::Move { dx: 0, dy: 1 }, Axiom::Move { dx: 0, dy: -1 }, Axiom::Move { dx: -1, dy: 0 }, Axiom::Move { dx: 1, dy: 0 }, Axiom::PaintAdjacent {color: Species::TermiPainted}],
+            AxiomKit::OnlyPaint => vec![Axiom::PaintAdjacent {color: Species::TermiPainted},Axiom::PaintAdjacent {color: Species::TermiPainted},Axiom::PaintAdjacent {color: Species::TermiPainted},Axiom::PaintAdjacent {color: Species::TermiPainted},Axiom::PaintAdjacent {color: Species::TermiPainted}],
         }
     }
 }

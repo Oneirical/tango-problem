@@ -38,7 +38,7 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
         return;
     }
     assert!(config.current_turn < config.max_turn_number);
-    for _turn in 0..50{ // large impact on performance: this number is the simulation speed
+    for _turn in 0..1{ // large impact on performance: this number is the simulation speed
         let mut beacon_of_light: (u32, u32) = (0,0);
         for (mut position, _trace, mut species) in hylics.iter_mut(){
             // Each entity can do an action by itself.
@@ -74,10 +74,12 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
 
             map = enter_tile(map, position.x, position.y, *species);
         }
+        //debug_print_axiom_map(&map);
         for (mut position, mut trace, mut species) in hylics.iter_mut(){
             map = exit_tile(map, position.x, position.y);
             // Then, the Axiom effects happen.
-            let action = grab_axiom_at_pos(&map.axiom_map, (position.x, position.y)); // This makes it impossible to stack multiple axioms in one location, it might need to be changed to a vector.
+            let action = grab_axiom_at_pos(&map.axiom_map, (position.x, position.y)); // This makes it impossible to stack multiple axioms in one location, it might need to be changed to a vector.       
+            map = void_axiom_at(map, (position.x, position.y));
             (position.x, position.y) = process_motion(position.x, position.y, action, &map.tiles);
             *species = process_metamorphosis(action, *species);
             map = process_axioms(map, action, (position.x, position.y));
@@ -90,6 +92,7 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
             map = exit_tile(map, position.x, position.y);
 
             let action = grab_axiom_at_pos(&map.axiom_map, (position.x, position.y));
+            map = void_axiom_at(map, (position.x, position.y));
             (position.x, position.y) = process_motion(position.x, position.y, action, &map.tiles);
             *species = process_metamorphosis(action, *species);
             map = process_axioms(map, action, (position.x, position.y));
@@ -113,6 +116,32 @@ pub fn process_axioms(
         let idx = map.xy_idx(i.1.0, i.1.1);
         map.axiom_map[idx] = i.0;
     }
+    map
+}
+
+pub fn debug_print_axiom_map(
+    map: &ResMut<Map>,
+){
+    let mut string = String::from("");
+    for i in &map.axiom_map{
+        let char: char = match i{
+            Axiom::Void => '.',
+            _ => '#'
+        };
+        string.push(char);
+        if string.len() == 45{
+            dbg!(string);
+            string = String::from("");
+        }
+    }
+}
+
+pub fn void_axiom_at(
+    mut map: ResMut<Map>,
+    pos: (u32, u32)
+) -> ResMut<Map>{
+    let idx = map.xy_idx(pos.0, pos.1);
+    map.axiom_map[idx] = Axiom::Void;
     map
 }
 
@@ -254,7 +283,7 @@ fn evolve_generation(
     if config.current_turn < config.max_turn_number{
         return;
     }
-    (map.tiles, map.catalogue, map.locations) = build_map(map.population.clone());
+    (map.tiles, map.catalogue, map.locations, map.axiom_map) = build_map(map.population.clone());
     let mut beacon_of_light: (u32, u32) = (0,0); // Very gory when more Hylics will get added.
     for (mut pos, mut trace, mut species) in hylics.iter_mut(){
         trace.shipped_positions = trace.positions.clone();

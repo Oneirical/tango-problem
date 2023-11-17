@@ -25,7 +25,7 @@ pub struct TheatreSettings {
 
 fn ship_gen_to_theatre(
     ship: Query<&Trace>,
-    mut theatre: Query<(&mut FinishedTrace, &Species)>,
+    mut theatre: Query<&mut FinishedTrace>,
     keys: Res<Input<KeyCode>>,
     //psy_sets: Res<PsychicSettings>,
     mut config: ResMut<TheatreSettings>,
@@ -33,32 +33,16 @@ fn ship_gen_to_theatre(
     if !keys.just_pressed(KeyCode::Space) {
         return;
     }
-    let mut all_positions = Vec::new();
-    let mut all_identity = Vec::new();
+    let mut all = Vec::new();
     for tracer in ship.iter(){
-        all_positions.push((&tracer.shipped_positions, tracer.original_species));
-        all_identity.push((&tracer.shipped_identity, tracer.original_species));
+        all.push((&tracer.shipped_positions, &tracer.shipped_identity));
     }
-    for (mut displayed, species) in theatre.iter_mut(){ // Ferris, forgive me for what just unfolded here - 13th of November, 2023
-        let mut index = 0;
-        for (p, s) in all_positions.clone(){
-            if s == *species{
-                displayed.positions = p.clone();
-                break;
-            }
-            index += 1;
-        }
-        all_positions.remove(index);
-
-        index = 0;
-        for (p, s) in all_identity.clone(){
-            if s == *species{
-                displayed.identity = p.clone();
-                break;
-            }
-            index += 1;
-        }
-        all_identity.remove(index);
+    let mut index = 0;
+    for mut displayed in theatre.iter_mut(){ // Ferris, forgive me for what just unfolded here - 13th of November, 2023
+        index += 1;
+        if index == all.len() {break;}
+        let result = (all[index].0.clone(), all[index].1.clone());
+        (displayed.positions, displayed.identity) = result;
     }
     config.current_turn = 0;
 }

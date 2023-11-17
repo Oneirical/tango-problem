@@ -22,7 +22,7 @@ pub enum Species {
 
 pub fn build_map(
     parameters: Vec<Species>,
-) -> (Vec<Species>, Vec<Species>,  Vec<Vec<(u32,u32)>>){
+) -> (Vec<Species>, Vec<Species>,  Vec<Vec<(u32,u32)>>, Vec<Axiom>){
     let mut map = Map::new();
     let mut rng = rand::thread_rng();
 
@@ -91,7 +91,7 @@ pub fn build_map(
 
 
     }
-    (map.tiles, catalogue, locations)
+    (map.tiles, catalogue, locations, map.axiom_map)
 }
 
 #[derive(Resource)]
@@ -107,7 +107,7 @@ pub struct Map {
 impl Map{
     fn new() -> Self{
         let mut recipe = vec![Species::Beacon];
-        for _i in 0..32{
+        for _i in 0..1{
             recipe.push(Species::Psychic);
         }
         let mut new_map = Self { tiles: Vec::with_capacity((PLAY_AREA_HEIGHT*PLAY_AREA_WIDTH) as usize), population: recipe, catalogue: Vec::new(), locations: Vec::new(), axiom_map: Vec::with_capacity((PLAY_AREA_HEIGHT*PLAY_AREA_WIDTH) as usize)};

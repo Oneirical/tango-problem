@@ -8,7 +8,7 @@ pub struct SimulationPlugin;
 
 impl Plugin for SimulationPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(SimulationSettings{max_turn_number: 100, current_turn: 100, current_generation: 0});
+        app.insert_resource(SimulationSettings{max_turn_number: MAX_TURN_NUMBER, current_turn: MAX_TURN_NUMBER, current_generation: 0});
         app.add_systems(Update, simulate_generation);
         app.add_systems(Update, evolve_generation);
         app.register_type::<SimulationSettings>();
@@ -17,6 +17,7 @@ impl Plugin for SimulationPlugin {
 
 pub const PLAY_AREA_WIDTH: u32 = 45;
 pub const PLAY_AREA_HEIGHT: u32 = 45;
+pub const MAX_TURN_NUMBER: usize = 100;
 
 #[derive(Resource, Default, Reflect)]
 #[reflect(Resource)]
@@ -29,7 +30,6 @@ pub struct SimulationSettings {
 fn simulate_generation( // Trying hard to make this concurrent with time_passes. Not sure if it will work. 10th November 2023
     // In order to make effects and spells happen: make a vector of (position, effect). Then, at the start of next turn, make them all happen. 12th November 2023
     mut config: ResMut<SimulationSettings>,
-    //mut all_creatures: Query<(&mut Position, &mut Trace, &mut Species)>,
     mut psychics: Query<(&mut Position, &mut Soul, &mut Trace, &mut Species), With<Soul>>,
     mut hylics: Query<(&mut Position, &mut Trace, &mut Species), Without<Soul>>,
     mut map: ResMut<Map>,
@@ -81,6 +81,7 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
 
             map = enter_tile(map, position.x, position.y, *species);
             trace.positions.push((position.x, position.y));
+            trace.identity.push(*species);
         }
         for (mut position, mut _soul, mut trace, mut species) in psychics.iter_mut(){
             map = exit_tile(map, position.x, position.y);
@@ -91,6 +92,7 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
 
             map = enter_tile(map, position.x, position.y, *species);
             trace.positions.push((position.x, position.y));
+            trace.identity.push(*species);
         }
         config.current_turn = turn;
     }
@@ -215,9 +217,9 @@ fn locate_quadrant( // Move this to a Senses file later
 
 fn evolve_generation(
     mut config: ResMut<SimulationSettings>,
-    mut psychics: Query<(&mut Position, &mut Soul, &mut Trace, &Species), With<Soul>>, // Consider making this the same query with Has<Soul>
+    mut psychics: Query<(&mut Position, &mut Soul, &mut Trace, &mut Species), With<Soul>>, // Consider making this the same query with Has<Soul>
     psy_settings: Res<PsychicSettings>,
-    mut hylics: Query<(&mut Position, &mut Trace, &Species), Without<Soul>>,
+    mut hylics: Query<(&mut Position, &mut Trace, &mut Species), Without<Soul>>,
     mut map: ResMut<Map>,
 
 ){
@@ -226,10 +228,12 @@ fn evolve_generation(
     }
     (map.tiles, map.catalogue, map.locations) = build_map(map.population.clone());
     let mut beacon_of_light: (u32, u32) = (0,0); // Very gory when more Hylics will get added.
-    for (mut pos, mut trace, species) in hylics.iter_mut(){
+    for (mut pos, mut trace, mut species) in hylics.iter_mut(){
         trace.shipped_positions = trace.positions.clone();
+        trace.shipped_identity = trace.identity.clone();
         trace.positions = Vec::with_capacity(config.max_turn_number);
-        let index = map.catalogue.iter().position(|r| r == species).unwrap();
+        let index = map.catalogue.iter().position(|r| r == &*species).unwrap();
+        let creature = map.catalogue[index];
         if map.locations[index].is_empty(){
             trace.positions.push((0, 0));
             // Super gory. Since we're always stuck with too many walls, some of them can't find a position and get tucked in a stack in the corner instead. Fix this.
@@ -238,8 +242,10 @@ fn evolve_generation(
         let Some((x,y)) = map.locations[index].pop() else { panic!("Locations assigment did not find an XY pair.") };
         (pos.x, pos.y) = (x, y);
         pos.starting_position = (x,y);
+        *species = creature;
         trace.positions.push((x, y));
-        match species{
+        trace.identity.push(*species);
+        match *species{
             Species::Beacon => beacon_of_light = (pos.x, pos.y),
             _ => ()
         }
@@ -247,7 +253,7 @@ fn evolve_generation(
     let mut all_souls: Vec<Net> = Vec::with_capacity(psy_settings.number_at_start as usize); 
     let mut all_fitnesses: Vec<f32> = Vec::with_capacity(psy_settings.number_at_start as usize);
     let mut best_fit = (0., 0);
-    for (mut pos, mut soul, mut trace, species) in psychics.iter_mut(){
+    for (mut pos, mut soul, mut trace, mut species) in psychics.iter_mut(){
         let mut final_fitness = if (pos.x as i32 - beacon_of_light.0 as i32).abs() < 2 && (pos.y as i32 - beacon_of_light.1 as i32).abs() < 2{
             100.
         } else if (pos.x as i32 - beacon_of_light.0 as i32).abs() < 5 && (pos.y as i32 - beacon_of_light.1 as i32).abs() < 5{
@@ -273,14 +279,18 @@ fn evolve_generation(
         }
         soul.fitness = final_fitness;
 
-        let index = map.catalogue.iter().position(|r| r == species).unwrap();
+        let index = map.catalogue.iter().position(|r| r == &*species).unwrap();
+        let creature = map.catalogue[index];
         let Some((x,y)) = map.locations[index].pop() else { panic!("Locations assigment did not find an XY pair.") };
         (pos.x, pos.y) = (x, y);
+        *species = creature;
         pos.starting_position = (x,y);
         trace.shipped_positions = trace.positions.clone();
+        trace.shipped_identity = trace.identity.clone();
         trace.positions = Vec::with_capacity(config.max_turn_number);
         trace.positions.push((x, y));
-        match species{
+        trace.identity.push(*species);
+        match *species{
             Species::Beacon => beacon_of_light = (pos.x, pos.y),
             _ => ()
         }

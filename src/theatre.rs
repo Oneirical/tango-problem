@@ -2,7 +2,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 use bevy_tweening::{Animator, EaseFunction, lens::TransformPositionLens, Tween};
 
-use crate::{psychics::{FinishedTrace, Trace, PsychicSettings}, map::Species};
+use crate::{psychics::{FinishedTrace, Trace}, map::Species};
 
 pub struct TheatrePlugin;
 
@@ -27,15 +27,17 @@ fn ship_gen_to_theatre(
     ship: Query<(&Trace, &Species)>,
     mut theatre: Query<(&mut FinishedTrace, &Species)>,
     keys: Res<Input<KeyCode>>,
-    psy_sets: Res<PsychicSettings>,
+    //psy_sets: Res<PsychicSettings>,
     mut config: ResMut<TheatreSettings>,
 ){
     if !keys.just_pressed(KeyCode::Space) {
         return;
     }
-    let mut all_positions = Vec::with_capacity(psy_sets.number_at_start as usize);
+    let mut all_positions = Vec::new();
+    let mut all_identity = Vec::new();
     for (tracer, species) in ship.iter(){
-        all_positions.push((tracer.shipped_positions.clone(), species));
+        all_positions.push((&tracer.shipped_positions, species));
+        all_identity.push((&tracer.shipped_identity, species));
     }
     for (mut displayed, species) in theatre.iter_mut(){ // Ferris, forgive me for what just unfolded here - 13th of November, 2023
         let mut index = 0;
@@ -47,6 +49,16 @@ fn ship_gen_to_theatre(
             index += 1;
         }
         all_positions.remove(index);
+
+        index = 0;
+        for (p, s) in all_identity.clone(){
+            if s == species{
+                displayed.identity = p.clone();
+                break;
+            }
+            index += 1;
+        }
+        all_identity.remove(index);
     }
     config.current_turn = 0;
 }
@@ -54,11 +66,11 @@ fn ship_gen_to_theatre(
 fn time_passes(
     time: Res<Time>,
     mut config: ResMut<TheatreSettings>,
-    mut theatre_actors: Query<(&Transform, &mut Animator<Transform>, &FinishedTrace)>,
+    mut theatre_actors: Query<(&Transform, &mut Animator<Transform>, &FinishedTrace, &mut TextureAtlasSprite)>,
 ){
     config.time_between_turns.tick(time.delta());
     if config.time_between_turns.finished() {
-        for (transform, mut anim, trace) in theatre_actors.iter_mut(){
+        for (transform, mut anim, trace, mut sprite) in theatre_actors.iter_mut(){
             if trace.positions.len() <= config.current_turn || config.current_turn >= config.max_turn_number{
                 continue;
             }
@@ -74,7 +86,24 @@ fn time_passes(
                 },
             );
             anim.set_tweenable(tween);
+            let new_sprite = trace.identity[config.current_turn];
+            let sprite_id = get_texture_id(new_sprite);
+            if sprite.index != sprite_id{
+                sprite.index = sprite_id;
+            }
+
         }
         config.current_turn += 1;
+    }
+}
+
+fn get_texture_id(
+    species: Species
+)-> usize{
+    match species{
+        Species::Wall => 3,
+        Species::Beacon => 1,
+        Species::Psychic => 0,
+        Species::Nothing => 2,
     }
 }

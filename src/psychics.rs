@@ -9,7 +9,7 @@ use crate::axiom::{Axiom, AxiomKit};
 use crate::map::{Map, Species, build_map};
 use crate::SpriteSheetHandle;
 use crate::nn::Net;
-use crate::simulation::{PLAY_AREA_HEIGHT, PLAY_AREA_WIDTH};
+use crate::simulation::{PLAY_AREA_HEIGHT, PLAY_AREA_WIDTH, MAX_TURN_NUMBER};
 use crate::theatre::TILE_SIZE;
 
 pub struct PsychicPlugin;
@@ -79,7 +79,7 @@ impl TheatreBundle { // Creatures displayed on screen.
                 ..default()
             },
             animation: Animator::new(tween),
-            finished_trace: FinishedTrace{positions: Vec::new()},
+            finished_trace: FinishedTrace{positions: Vec::new(), identity: Vec::new()},
             name: Name::new("TheatreDisplay"),
             species: Species::Wall
         }
@@ -123,7 +123,12 @@ impl PsychicBundle { // Creatures simulated in the genetic process.
                 fitness: 0.
             },
             position: Position { x: 0, y: 0, starting_position: (0, 0) },
-            trace: Trace {positions: Vec::new(), shipped_positions: Vec::new()},
+            trace: Trace {
+                positions: Vec::with_capacity(MAX_TURN_NUMBER),
+                shipped_positions: Vec::with_capacity(MAX_TURN_NUMBER), 
+                identity: Vec::with_capacity(MAX_TURN_NUMBER), 
+                shipped_identity: Vec::with_capacity(MAX_TURN_NUMBER)
+            },
             name: Name::new("Psychic"),
             species: Species::Wall
         }
@@ -155,7 +160,12 @@ impl HylicBundle { // Creatures without a neural network, who present challenges
     pub fn new() -> Self{
         Self{
             position: Position { x: 0, y: 0, starting_position: (0, 0) },
-            trace: Trace {positions: Vec::new(), shipped_positions: Vec::new()},
+            trace: Trace {
+                positions: Vec::with_capacity(MAX_TURN_NUMBER),
+                shipped_positions: Vec::with_capacity(MAX_TURN_NUMBER), 
+                identity: Vec::with_capacity(MAX_TURN_NUMBER), 
+                shipped_identity: Vec::with_capacity(MAX_TURN_NUMBER)
+            },
             name: Name::new("Hylic"),
             species: Species::Wall
         }
@@ -201,12 +211,15 @@ pub struct Position{
 #[derive(Component)]
 pub struct Trace{
     pub positions: Vec<(u32, u32)>,
-    pub shipped_positions: Vec<(u32, u32)>
+    pub shipped_positions: Vec<(u32, u32)>,
+    pub identity: Vec<Species>,
+    pub shipped_identity: Vec<Species>,
 }
 
 #[derive(Component)]
 pub struct FinishedTrace{
-    pub positions: Vec<(u32, u32)>
+    pub positions: Vec<(u32, u32)>,
+    pub identity: Vec<Species>,
 }
 
 fn distribute_psychics(

@@ -93,7 +93,7 @@ impl Layer{
                     continue;
                 }
 
-                *val += rng.gen_range(-1.5..1.5) as f64;
+                *val += rng.gen_range(-0.5..0.5) as f64;
             }
         }
     }

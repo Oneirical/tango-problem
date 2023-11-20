@@ -145,7 +145,7 @@ impl PsychicBundle { // Creatures simulated in the genetic process.
             self.soul.action_choices.append(&mut kit.unpack());
         }
         self.soul.nn = Net::new(vec![
-            9_usize, // This will have to be adapted to the number of Senses.
+            75_usize, // This will have to be adapted to the number of Senses.
             15,
             self.soul.action_choices.len(),
         ]);
@@ -248,7 +248,7 @@ fn distribute_psychics(
                 Species::Psychic => {
                     let psy = PsychicBundle::new()
                         .with_position(x, y)
-                        .with_axiom_kits(vec![AxiomKit::OnlyPaint])
+                        .with_axiom_kits(vec![AxiomKit::PaintKit])
                         .with_species(Species::Psychic);
                     let theatre = TheatreBundle::new(&tex_handle).with_position(x, y).with_species(Species::Psychic);
                     commands.spawn(psy);

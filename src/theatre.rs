@@ -92,6 +92,6 @@ fn get_texture_id(
         Species::Beacon => 1,
         Species::Psychic => 0,
         Species::Nothing => 2,
-        Species::TermiPainted => 5,
+        Species::TermiPainted => 55,
     }
 }

@@ -38,16 +38,18 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
         return;
     }
     assert!(config.current_turn < config.max_turn_number);
-    for _turn in 0..1{ // large impact on performance: this number is the simulation speed
+    for _turn in 0..10{ // large impact on performance: this number is the simulation speed
         let mut beacon_of_light: (u32, u32) = (0,0);
         for (mut position, _trace, mut species) in hylics.iter_mut(){
             // Each entity can do an action by itself.
             map = exit_tile(map, position.x, position.y);
 
             let action = Axiom::Move { dx: 0, dy: 0 };
-            (position.x, position.y) = process_motion(position.x, position.y, action, &map.tiles);
+            let performance;
+            ((position.x, position.y), performance) = process_motion(position.x, position.y, action, &map.tiles);
             *species = process_metamorphosis(action, *species);
-            map = process_axioms(map, action, (position.x, position.y));
+            let performance;
+            (map, performance) = process_axioms(map, action, (position.x, position.y));
 
             map = enter_tile(map, position.x, position.y, *species);
 
@@ -58,19 +60,26 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
             }
         }
         for (mut position, mut soul, mut _trace, mut species) in psychics.iter_mut(){
-            soul.senses_input = locate_quadrant(position.x, position.y, beacon_of_light.0, beacon_of_light.1);
-            soul.senses_input.append(&mut find_adjacent_collisions((position.x, position.y), &map.tiles));
-            soul.senses_input.append(&mut vec![10./(10.+((position.x as i32 - beacon_of_light.0 as i32).abs() + (position.y as i32 - beacon_of_light.1 as i32).abs()) as f64)]);
+            //soul.senses_input = locate_quadrant(position.x, position.y, beacon_of_light.0, beacon_of_light.1);
+            soul.senses_input = find_near_collisions((position.x, position.y), &map.tiles, 2);
+            soul.senses_input.append(&mut find_near_of_species((position.x, position.y), &map.tiles, Species::TermiPainted, 2));
+            soul.senses_input.append(&mut find_near_of_species((position.x, position.y), &map.tiles, Species::Wall, 2));
+            //dbg!(soul.senses_input.len());
+            //soul.senses_input.append(&mut vec![10./(10.+((position.x as i32 - beacon_of_light.0 as i32).abs() + (position.y as i32 - beacon_of_light.1 as i32).abs()) as f64)]);
             soul.decision_outputs = soul.nn.decide(&soul.senses_input);
             let index_of_biggest = soul.decision_outputs.iter().enumerate().fold((0, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
             let action = soul.action_choices[index_of_biggest.0];
             if !soul.actions_chosen.contains(&action.act_motion()){ soul.actions_chosen.push(action.act_motion())};
             // Each entity can do an action by itself.
             map = exit_tile(map, position.x, position.y);
-
-            (position.x, position.y) = process_motion(position.x, position.y, action, &map.tiles);
+            let performance;
+            ((position.x, position.y), performance) = process_motion(position.x, position.y, action, &map.tiles);
+            soul.fitness += performance as f32;
             *species = process_metamorphosis(action, *species);
-            map = process_axioms(map, action, (position.x, position.y));
+            let performance;
+            (map, performance) = process_axioms(map, action, (position.x, position.y));
+            soul.fitness += performance as f32;
+            //dbg!(performance);
 
             map = enter_tile(map, position.x, position.y, *species);
         }
@@ -80,9 +89,11 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
             // Then, the Axiom effects happen.
             let action = grab_axiom_at_pos(&map.axiom_map, (position.x, position.y)); // This makes it impossible to stack multiple axioms in one location, it might need to be changed to a vector.       
             map = void_axiom_at(map, (position.x, position.y));
-            (position.x, position.y) = process_motion(position.x, position.y, action, &map.tiles);
+            let performance;
+            ((position.x, position.y), performance) = process_motion(position.x, position.y, action, &map.tiles);
             *species = process_metamorphosis(action, *species);
-            map = process_axioms(map, action, (position.x, position.y));
+            let performance;
+            (map, performance) = process_axioms(map, action, (position.x, position.y));
 
             map = enter_tile(map, position.x, position.y, *species);
             trace.positions.push((position.x, position.y));
@@ -93,9 +104,11 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
 
             let action = grab_axiom_at_pos(&map.axiom_map, (position.x, position.y));
             map = void_axiom_at(map, (position.x, position.y));
-            (position.x, position.y) = process_motion(position.x, position.y, action, &map.tiles);
+            let performance;
+            ((position.x, position.y), performance) = process_motion(position.x, position.y, action, &map.tiles);
             *species = process_metamorphosis(action, *species);
-            map = process_axioms(map, action, (position.x, position.y));
+            let performance;
+            (map, performance) = process_axioms(map, action, (position.x, position.y));
 
             map = enter_tile(map, position.x, position.y, *species);
             trace.positions.push((position.x, position.y));
@@ -109,14 +122,20 @@ pub fn process_axioms(
     mut map: ResMut<Map>,
     action: Axiom,
     cur_pos: (u32, u32),
-)-> ResMut<Map>{
+)-> (ResMut<Map>, i16){
     let effects = action.act_axioms(cur_pos, &map);
-    if effects.is_empty() {return map;}
+    let mut performance = 0;
+    if effects.is_empty() {return (map, 0);}
     for i in effects{
         let idx = map.xy_idx(i.1.0, i.1.1);
         map.axiom_map[idx] = i.0;
+        if i.0 != Axiom::Void{
+            performance += 10;
+        }
+        else { performance += -1;}
+        
     }
-    map
+    (map, performance)
 }
 
 pub fn debug_print_axiom_map(
@@ -179,11 +198,14 @@ pub fn exit_tile(mut map: ResMut<Map>, x: u32, y: u32) -> ResMut<Map>{
 
 pub fn get_adjacent_coords(
     pos: (u32, u32),
+    range: i32
 ) -> Vec<(u32, u32)>{
-    let mut search = Vec::with_capacity(4);
-    let mut output = Vec::with_capacity(4);
-    for i in [(0,1), (1,0), (-1, 0), (0,-1)]{
-        search.push(i);
+    let mut search = Vec::with_capacity((range*8) as usize);
+    let mut output = Vec::with_capacity((range*8) as usize);
+    for i in -range..=range{
+        for j in -range..=range{
+            search.push((i,j));
+        }
     }
     for i in search{
         let new_coords = (process_x(pos.0 as i32+i.0) as u32, process_y(pos.1 as i32+i.1) as u32);
@@ -193,18 +215,33 @@ pub fn get_adjacent_coords(
 }
 
 
-pub fn find_adjacent_collisions(
+pub fn find_near_collisions(
     pos: (u32, u32),
-    collision_map: &[Species]
+    collision_map: &[Species],
+    range: i32
 ) -> Vec<f64>{
     let mut output = Vec::with_capacity(4);
-    for i in get_adjacent_coords(pos){
+    for i in get_adjacent_coords(pos, range){
         if target_is_empty(i, collision_map){
             output.push(1.);
         } else {output.push(0.)};
     }
     output
+}
 
+pub fn find_near_of_species(
+    pos: (u32, u32),
+    collision_map: &[Species],
+    species: Species,
+    range: i32,
+) -> Vec<f64>{
+    let mut output = Vec::with_capacity(4);
+    for i in get_adjacent_coords(pos, range){
+        if target_is_of_species(i, collision_map, species){
+            output.push(1.);
+        } else {output.push(0.)};
+    }
+    output
 }
 
 pub fn grab_axiom_at_pos(
@@ -221,6 +258,15 @@ pub fn target_is_empty(
 ) -> bool {
     let idx = xy_idx(new_pos.0, new_pos.1);
     collision_map[idx] == Species::Nothing
+}
+
+pub fn target_is_of_species(
+    new_pos: (u32, u32),
+    collision_map: &[Species],
+    species: Species,
+) -> bool {
+    let idx = xy_idx(new_pos.0, new_pos.1);
+    collision_map[idx] == species
 }
 
 fn process_metamorphosis(
@@ -240,12 +286,12 @@ fn process_motion(
     cur_y: u32,
     action: Axiom,
     collision_map: &[Species],
-) -> (u32, u32){
+) -> ((u32, u32), i16){
     let (dx, dy) = action.act_motion();
     let new_coords = (process_x(cur_x as i32 + dx) as u32, process_y(cur_y as i32 + dy) as u32);
-    if target_is_empty(new_coords, collision_map) { //
-        new_coords
-    } else { (cur_x, cur_y) }   
+    if target_is_empty(new_coords, collision_map) || new_coords == (cur_x, cur_y) { //
+        (new_coords, 3)
+    } else { ((cur_x, cur_y), 2) }   
 }
 
 fn locate_quadrant( // Move this to a Senses file later
@@ -320,30 +366,6 @@ fn evolve_generation(
     let mut all_fitnesses: Vec<f32> = Vec::with_capacity(psy_settings.number_at_start as usize);
     let mut best_fit = (0., 0);
     for (mut pos, mut soul, mut trace, mut species) in psychics.iter_mut(){
-        let mut final_fitness = if (pos.x as i32 - beacon_of_light.0 as i32).abs() < 2 && (pos.y as i32 - beacon_of_light.1 as i32).abs() < 2{
-            100.
-        } else if (pos.x as i32 - beacon_of_light.0 as i32).abs() < 5 && (pos.y as i32 - beacon_of_light.1 as i32).abs() < 5{
-            50.
-        } else if (pos.x as i32 - beacon_of_light.0 as i32).abs() < 10 && (pos.y as i32 - beacon_of_light.1 as i32).abs() < 10{
-            10.
-        } else {
-            1.
-        };
-        //dbg!(soul.actions_chosen.clone());
-        if soul.actions_chosen.len() > 2{
-
-            final_fitness += 1000.;
-        }
-
-        soul.actions_chosen = Vec::new();
-        //30.-((pos.x as i32 - beacon_of_light.0 as i32).abs() + (pos.y as i32 - beacon_of_light.1 as i32).abs()) as f32;
-        if pos.x == 44 || pos.y == 44 || pos.x == 0 || pos.y == 0{
-            final_fitness *= 0.5;
-        }
-        if (pos.x, pos.y) == pos.starting_position{
-            final_fitness = 0.3;
-        }
-        soul.fitness = final_fitness;
         let creature = trace.original_species;
         let index = map.catalogue.iter().position(|r| r == &creature).unwrap();
         let Some((x,y)) = map.locations[index].pop() else { 
@@ -355,7 +377,7 @@ fn evolve_generation(
         pos.starting_position = (x,y);
         trace.shipped_positions = trace.positions.clone();
         trace.shipped_identity = trace.identity.clone();
-        trace.identity = Vec::with_capacity(config.max_turn_number);
+        trace.identity = Vec::with_capacity(config.max_turn_number); // Can't believe I wasted 5 hours figuring out a mysterious bug only to realize I forgot to empty the trace.identity after each generation lolololol 19th of november 2023
         trace.positions = Vec::with_capacity(config.max_turn_number);
         trace.positions.push((x, y));
         trace.identity.push(*species);
@@ -363,11 +385,22 @@ fn evolve_generation(
             Species::Beacon => beacon_of_light = (pos.x, pos.y),
             _ => ()
         }
+        if soul.fitness > 3. {
+            soul.fitness *= 12.;
+        }
+        if soul.actions_chosen.len() > 2{
 
+            soul.fitness *= 5.;
+        }
+        if soul.actions_chosen.len() > 3{
+
+            soul.fitness *= 10.;
+        }
+        if soul.fitness <= 0. {soul.fitness = 1.};
         all_souls.push(soul.nn.clone());
-        all_fitnesses.push(final_fitness);
-        if final_fitness > best_fit.0{
-            best_fit = (final_fitness, all_fitnesses.len()-1);
+        all_fitnesses.push(soul.fitness);
+        if soul.fitness > best_fit.0{
+            best_fit = (soul.fitness, all_fitnesses.len()-1);
         }
     }
     //dbg!(all_fitnesses.clone());
@@ -378,6 +411,7 @@ fn evolve_generation(
         let mut rand_soul = all_souls[soul_idx].clone(); // soul_idx
         rand_soul.mutate();
         soul.nn = rand_soul;
+        soul.fitness = 0.01;
     }
     config.current_turn = 0 ;
     config.current_generation += 1;

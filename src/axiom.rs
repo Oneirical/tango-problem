@@ -31,9 +31,12 @@ impl Axiom{
         let mut output = Vec::new();
         match self{
             Axiom::PaintAdjacent {color} => {
-                for i in get_adjacent_coords(pos){
+                for i in get_adjacent_coords(pos, 1){
                     if map.tiles[map.xy_idx(i.0, i.1)] == Species::Wall{
                         output.push((Axiom::SpeciesTransform { new_species: color }, i));
+                    }
+                    else if map.tiles[map.xy_idx(i.0, i.1)] == Species::TermiPainted{ // so we can deduct points
+                        output.push((Axiom::Void, i));
                     }
                 }
             },

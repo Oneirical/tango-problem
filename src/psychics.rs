@@ -145,8 +145,9 @@ impl PsychicBundle { // Creatures simulated in the genetic process.
             self.soul.action_choices.append(&mut kit.unpack());
         }
         self.soul.nn = Net::new(vec![
-            75_usize, // This will have to be adapted to the number of Senses.
-            15,
+            43_usize, // This will have to be adapted to the number of Senses.
+            40,
+            40,
             self.soul.action_choices.len(),
         ]);
         self

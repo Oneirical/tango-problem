@@ -62,14 +62,15 @@ fn simulate_generation( // Trying hard to make this concurrent with time_passes.
         for (mut position, mut soul, mut _trace, mut species) in psychics.iter_mut(){
             //soul.senses_input = locate_quadrant(position.x, position.y, beacon_of_light.0, beacon_of_light.1);
             soul.senses_input = find_near_collisions((position.x, position.y), &map.tiles, 2);
-            soul.senses_input.append(&mut find_near_of_species((position.x, position.y), &map.tiles, Species::TermiPainted, 2));
-            soul.senses_input.append(&mut find_near_of_species((position.x, position.y), &map.tiles, Species::Wall, 2));
+            soul.senses_input.append(&mut find_near_of_species((position.x, position.y), &map.tiles, Species::TermiPainted, 1));
+            soul.senses_input.append(&mut find_near_of_species((position.x, position.y), &map.tiles, Species::Wall, 1));
             //dbg!(soul.senses_input.len());
             //soul.senses_input.append(&mut vec![10./(10.+((position.x as i32 - beacon_of_light.0 as i32).abs() + (position.y as i32 - beacon_of_light.1 as i32).abs()) as f64)]);
             soul.decision_outputs = soul.nn.decide(&soul.senses_input);
             let index_of_biggest = soul.decision_outputs.iter().enumerate().fold((0, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
             let action = soul.action_choices[index_of_biggest.0];
             if !soul.actions_chosen.contains(&action.act_motion()){ soul.actions_chosen.push(action.act_motion())};
+            if action == (Axiom::PaintAdjacent { color: Species::TermiPainted}) && !soul.actions_chosen.contains(&(0,0)) { soul.actions_chosen.push((0,0))};
             // Each entity can do an action by itself.
             map = exit_tile(map, position.x, position.y);
             let performance;
@@ -130,7 +131,7 @@ pub fn process_axioms(
         let idx = map.xy_idx(i.1.0, i.1.1);
         map.axiom_map[idx] = i.0;
         if i.0 != Axiom::Void{
-            performance += 10;
+            performance += 2;
         }
         else { performance += -1;}
         
@@ -290,8 +291,8 @@ fn process_motion(
     let (dx, dy) = action.act_motion();
     let new_coords = (process_x(cur_x as i32 + dx) as u32, process_y(cur_y as i32 + dy) as u32);
     if target_is_empty(new_coords, collision_map) || new_coords == (cur_x, cur_y) { //
-        (new_coords, 3)
-    } else { ((cur_x, cur_y), 2) }   
+        (new_coords, 0)
+    } else { ((cur_x, cur_y), 0) }   
 }
 
 fn locate_quadrant( // Move this to a Senses file later
@@ -372,6 +373,12 @@ fn evolve_generation(
             dbg!(&map.locations[index]);
             dbg!(index);
             panic!("Locations assigment did not find an XY pair.") };
+        if (pos.x as i32 - pos.starting_position.0 as i32).abs() > 4 && (pos.y as i32 - pos.starting_position.1 as i32).abs() > 4 {
+            if soul.fitness > 8. {
+                soul.fitness *= 100.
+            }
+            else {soul.fitness *= 5.};
+        }
         (pos.x, pos.y) = (x, y);
         *species = creature;
         pos.starting_position = (x,y);
@@ -385,16 +392,16 @@ fn evolve_generation(
             Species::Beacon => beacon_of_light = (pos.x, pos.y),
             _ => ()
         }
-        if soul.fitness > 3. {
+        if soul.fitness > 30. {
             soul.fitness *= 12.;
-        }
-        if soul.actions_chosen.len() > 2{
-
-            soul.fitness *= 5.;
         }
         if soul.actions_chosen.len() > 3{
 
-            soul.fitness *= 10.;
+            soul.fitness *= 100.;
+        }
+        if soul.actions_chosen.contains(&(0,0)){
+
+            soul.fitness *= 20.;
         }
         if soul.fitness <= 0. {soul.fitness = 1.};
         all_souls.push(soul.nn.clone());

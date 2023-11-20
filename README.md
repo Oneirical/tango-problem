@@ -41,9 +41,7 @@ Once again, I added extra objectives:
 * Receive a penalty for re-painting already painted walls (this resulted in Psychics being terrified of ever painting anything)
 * Receive a bonus for moving far away from the spawn location (this result in Psychics all rushing the bottom of the screen and painting it, leaving the rest of the level unpainted)
 
-[Some of these behaviours can be observed here.]()
-
-Significant tweaking may eventually produce even more performant results, but for now, a balance of all these objectives does succeed in achieving a ["trickle down" strategy where all Psychics move towards the bottom of the screen, painting walls as they fall down.]() (Creatures being in walls at the bottom is purely a visual glitch - I am not quite sure how to handle getting just the right amount of Bevy entities in each simulation without causing major performance issues).
+Significant tweaking may eventually produce even more performant results, but for now, a balance of all these objectives does succeed in achieving a ["trickle down" strategy where all Psychics move towards the bottom of the screen, painting walls as they fall down.](https://yewtu.be/embed/UDU3e50UbQo) (Creatures being in walls at the bottom is purely a visual glitch - I am not quite sure how to handle getting just the right amount of Bevy entities in each simulation without causing major performance issues).
 
 ***
 

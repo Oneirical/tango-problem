@@ -39,6 +39,8 @@ fn ship_gen_to_theatre(
     }
     let mut index = 0;
     for mut displayed in theatre.iter_mut(){ // Ferris, forgive me for what just unfolded here - 13th of November, 2023
+        displayed.positions = Vec::new();
+        displayed.identity = Vec::new();
         index += 1;
         if index == all.len() {break;}
         let result = (all[index].0.clone(), all[index].1.clone());
@@ -72,6 +74,7 @@ fn time_passes(
             anim.set_tweenable(tween);
             let new_sprite = trace.identity[config.current_turn];
             let sprite_id = get_texture_id(new_sprite);
+            //if sprite_id == 5 {dbg!(&trace.identity);}
             if sprite.index != sprite_id{
                 sprite.index = sprite_id;
             }

@@ -226,7 +226,14 @@ pub fn target_is_empty(
 fn process_metamorphosis(
     action: Axiom,
     species: Species
-) -> Species {action.act_transform(species)}
+) -> Species {
+    let ori = species;
+    let spe = action.act_transform(species);
+    if ori == Species::TermiPainted && spe == Species::Wall{
+        panic!();
+    }
+    spe
+}
 
 fn process_motion(
     cur_x: u32,
@@ -288,6 +295,7 @@ fn evolve_generation(
     for (mut pos, mut trace, mut species) in hylics.iter_mut(){
         trace.shipped_positions = trace.positions.clone();
         trace.shipped_identity = trace.identity.clone();
+        trace.identity = Vec::with_capacity(config.max_turn_number);
         trace.positions = Vec::with_capacity(config.max_turn_number);
         let creature = trace.original_species;
         let index = map.catalogue.iter().position(|r| r == &creature).unwrap();
@@ -297,8 +305,6 @@ fn evolve_generation(
             break;
         }
         let Some((x,y)) = map.locations[index].pop() else { 
-            dbg!(&map.locations[index]);
-            dbg!(index);
             panic!("Locations assigment did not find an XY pair.") };
         (pos.x, pos.y) = (x, y);
         pos.starting_position = (x,y);
@@ -349,6 +355,7 @@ fn evolve_generation(
         pos.starting_position = (x,y);
         trace.shipped_positions = trace.positions.clone();
         trace.shipped_identity = trace.identity.clone();
+        trace.identity = Vec::with_capacity(config.max_turn_number);
         trace.positions = Vec::with_capacity(config.max_turn_number);
         trace.positions.push((x, y));
         trace.identity.push(*species);
